@@ -1,0 +1,2081 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>STA · Stability Form</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- Firebase SDK (compat version — ไม่ต้องใช้ Node.js) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#f4f2ee;
+  --card:#fff;
+  --border:#e2ddd5;
+  --text:#1a1814;
+  --muted:#8c877f;
+  --green:#2d6b52;
+  --green-lt:#e6f4ed;
+  --red:#c0392b;
+  --red-lt:#fdecea;
+  --amber:#b8700a;
+  --amber-lt:#fef3e0;
+  --mono:'DM Mono',monospace;
+  --thai:'Noto Sans Thai',sans-serif;
+  --sh:0 2px 10px rgba(0,0,0,0.08);
+  /* condition colors */
+  --rt:#1a7a4a; --rt-bg:#e5f5ec;
+  --c50:#b84000; --c50-bg:#fdeee6;
+  --c4:#1a4a9a; --c4-bg:#e5edf9;
+  --cl:#8a6500; --cl-bg:#fdf6e0;
+}
+html{scroll-behavior:smooth}
+body{font-family:var(--thai);background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:140px}
+
+/* ══ HEADER ══ */
+.hdr{
+  background:#1a0a0a;
+  padding:12px 14px 10px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:300;
+  border-bottom:2px solid var(--red);
+}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-icon{
+  background:var(--red);color:#fff;
+  width:32px;height:32px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:0.85rem;font-weight:700;font-family:var(--mono);
+}
+.logo-text{color:#fff;font-size:1rem;font-weight:600;letter-spacing:0.04em}
+.logo-sub{color:#888;font-size:0.65rem;font-family:var(--mono);letter-spacing:0.08em}
+.hdr-actions{display:flex;gap:8px;align-items:center}
+.hdr-btn{
+  background:rgba(255,255,255,0.08);color:#ccc;
+  border:1px solid rgba(255,255,255,0.15);border-radius:8px;
+  padding:6px 12px;font-size:0.72rem;font-family:var(--mono);cursor:pointer;
+  white-space:nowrap;
+}
+.hdr-btn.red{background:var(--red);color:#fff;border-color:var(--red)}
+
+/* ══ TABS ══ */
+.tabs{
+  background:#1a0a0a;display:flex;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  position:sticky;top:54px;z-index:200;
+}
+.tab{
+  flex:1;padding:10px 4px;text-align:center;
+  font-size:0.72rem;font-family:var(--thai);color:#666;
+  border-bottom:2px solid transparent;cursor:pointer;transition:all 0.2s;
+}
+.tab.on{color:#fff;border-bottom-color:var(--red);font-weight:600}
+
+/* ══ PAGE ══ */
+.page{display:none;padding:6px 10px 0;animation:fadeUp 0.25s ease}
+.page.on{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ══ STICKY SAMPLE BAR ══ */
+.sticky-sample{
+  position:sticky;top:92px;z-index:190;
+  background:#f8f6f2;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;
+  border-bottom:2px solid var(--border);
+  border-top:1px solid var(--border);
+  box-shadow:0 2px 8px rgba(0,0,0,0.08);
+  margin:0 -10px;
+}
+.ss-left{display:flex;flex-direction:column;gap:1px;overflow:hidden;flex:1;min-width:0}
+.ss-no{
+  font-family:var(--mono);font-size:0.72rem;font-weight:700;
+  color:var(--red);letter-spacing:0.08em;white-space:nowrap;
+}
+.ss-no.empty{color:#bbb}
+.ss-name{
+  font-size:0.88rem;font-weight:600;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:calc(100vw - 160px);
+}
+.ss-name.empty{color:#bbb;font-size:0.78rem;font-style:italic;font-weight:400}
+.ss-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.ss-week{
+  background:var(--red);color:#fff;
+  border:2px solid #e55;border-radius:8px;
+  padding:5px 10px;font-family:var(--mono);font-size:0.88rem;font-weight:700;
+  outline:none;-webkit-appearance:none;cursor:pointer;
+  letter-spacing:0.06em;text-align:center;min-width:68px;
+}
+.ss-week option{background:#1a0a0a;color:#fff}
+.ss-dot{width:8px;height:8px;border-radius:50%;background:#ccc;flex-shrink:0}
+.ss-dot.has{background:#2ecc71}
+.ss-dot.fail{background:#e74c3c}
+
+/* ══ WEEK SELECTOR (inside sc-card) ══ */
+.week-select{
+  background:#c0392b;color:#fff;
+  border:2px solid #ff6b6b;border-radius:9px;
+  padding:6px 12px;font-family:var(--mono);font-size:0.92rem;font-weight:700;
+  outline:none;-webkit-appearance:none;cursor:pointer;
+  letter-spacing:0.05em;min-width:72px;text-align:center;
+  box-shadow:0 1px 6px rgba(192,57,43,0.35);
+}
+.week-select option{background:#1a0a0a;color:#fff}
+.week-indicator{
+  display:flex;align-items:center;gap:4px;
+  font-size:0.58rem;color:var(--muted);font-family:var(--mono);
+}
+.week-dot{width:6px;height:6px;border-radius:50%;background:#ccc}
+.week-dot.has{background:#44cc88}
+
+/* ══ PROGRESS DOT ══ */
+.w0app-body{overflow:hidden;transition:max-height 0.35s ease,opacity 0.25s ease;max-height:600px;opacity:1}
+.w0app-body.collapsed{max-height:0;opacity:0;pointer-events:none}
+.w0-toggle{
+  background:rgba(255,255,255,0.1);color:#aee8c0;
+  border:1px solid rgba(255,255,255,0.2);border-radius:8px;
+  padding:3px 10px;font-size:0.65rem;font-family:var(--mono);cursor:pointer;
+  transition:all 0.2s;white-space:nowrap;
+}
+.w0-toggle:active{transform:scale(0.95)}
+
+/* ══ HISTORY TIMELINE ══ */
+.timeline-wrap{margin-bottom:10px}
+.tl-title{
+  font-size:0.65rem;color:var(--muted);font-family:var(--mono);
+  text-transform:uppercase;letter-spacing:0.1em;
+  padding:0 2px 6px;display:flex;justify-content:space-between;
+}
+.tl-scroll{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
+.tl-scroll::-webkit-scrollbar{display:none}
+.tl-item{
+  flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px;
+  cursor:pointer;min-width:52px;
+}
+.tl-circle{
+  width:38px;height:38px;border-radius:50%;
+  border:2px solid var(--border);background:var(--card);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:all 0.2s;position:relative;
+}
+.tl-circle.has-data{border-color:var(--green);background:var(--green-lt)}
+.tl-circle.has-data.fail{border-color:var(--red);background:var(--red-lt)}
+.tl-circle.has-data.caution{border-color:var(--amber);background:var(--amber-lt)}
+.tl-circle.active{border-color:var(--red);border-width:3px;background:#fff0ef;box-shadow:0 0 0 3px rgba(192,57,43,0.2)}
+.tl-week{font-family:var(--mono);font-size:0.68rem;font-weight:700;color:var(--text)}
+.tl-grade{font-size:0.55rem;font-weight:700;font-family:var(--mono);margin-top:-1px}
+.tl-grade.a,.tl-grade.b{color:var(--green)}
+.tl-grade.c{color:var(--amber)}
+.tl-grade.d{color:var(--red)}
+.tl-label{font-size:0.58rem;color:var(--muted);font-family:var(--mono);text-align:center}
+.tl-line{position:relative}
+.tl-line::before{
+  content:'';position:absolute;left:-6px;top:19px;
+  width:6px;height:2px;background:var(--border);
+}
+.tl-item:first-child .tl-line::before{display:none}
+
+/* ══ SECTION ══ */
+.sec{margin-bottom:10px}
+.sec-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;background:var(--text);color:#fff;
+  border-radius:10px 10px 0 0;
+}
+.sec-title{font-size:0.78rem;font-weight:600;letter-spacing:0.02em}
+.sec-sub{font-size:0.6rem;color:#888;font-family:var(--mono)}
+.sec-body{
+  background:var(--card);border:1px solid var(--border);border-top:none;
+  border-radius:0 0 10px 10px;overflow:hidden;
+}
+
+/* ══ pH GRID ══ */
+.ph-grid{display:grid;grid-template-columns:48px repeat(4,1fr);border-collapse:collapse}
+.ph-th{
+  padding:6px 4px;font-size:0.62rem;font-family:var(--mono);
+  text-align:center;font-weight:600;border-bottom:1px solid var(--border);
+}
+.ph-th.rt{background:var(--rt-bg);color:var(--rt)}
+.ph-th.c50{background:var(--c50-bg);color:var(--c50)}
+.ph-th.c4{background:var(--c4-bg);color:var(--c4)}
+.ph-th.cl{background:var(--cl-bg);color:var(--cl)}
+.ph-th.label{background:var(--bg);font-size:0.58rem;color:var(--muted)}
+.ph-cell{padding:4px 3px;border-bottom:1px solid var(--border);border-right:1px solid var(--border)}
+.ph-cell:last-child{border-right:none}
+.ph-cell.row-lbl{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:0.72rem;font-weight:600;background:var(--bg)}
+.ph-cell.w0-ref{background:#f8f8f0;text-align:center;font-family:var(--mono);font-size:0.72rem;color:var(--muted);padding:4px 2px}
+.ph-inp{
+  width:100%;background:transparent;border:none;
+  text-align:center;font-family:var(--mono);font-size:0.88rem;
+  color:var(--text);outline:none;padding:6px 2px;
+}
+.ph-inp:focus{background:#f0f8f4}
+.ph-inp.ok{color:var(--green);background:#f0f8f4;font-weight:600}
+.ph-inp.warn{color:var(--amber);background:var(--amber-lt);font-weight:600}
+.ph-inp.fail{color:var(--red);background:var(--red-lt);font-weight:700}
+
+/* ══ PARAM BLOCK ══ */
+.param-blk{border-bottom:1px solid var(--border)}
+.param-blk:last-child{border-bottom:none}
+.param-name-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 12px 6px;
+}
+.param-name{font-size:0.82rem;font-weight:600}
+.param-eng{font-size:0.65rem;color:var(--muted);font-family:var(--mono)}
+.param-score-badge{
+  background:var(--bg);border:1px solid var(--border);
+  border-radius:20px;padding:2px 8px;
+  font-size:0.6rem;font-family:var(--mono);color:var(--muted);
+}
+
+/* ══ W0 REF ROW ══ */
+.w0-ref-row{
+  display:none;
+  grid-template-columns:60px repeat(4,1fr);
+  gap:3px;padding:0 8px 4px;background:#fafaf6;
+  border-bottom:1px dashed var(--border);
+}
+.w0-ref-row.show{display:grid}
+.w0-ref-lbl{font-size:0.58rem;color:var(--muted);font-family:var(--mono);display:flex;align-items:center}
+.w0-ref-cell{
+  font-size:0.62rem;color:var(--muted);font-family:var(--thai);
+  text-align:center;padding:3px 2px;
+  background:var(--bg);border-radius:4px;border:1px dashed var(--border);
+  min-height:24px;display:flex;align-items:center;justify-content:center;line-height:1.2;
+}
+
+/* ══ COND COLS ══ */
+.cond-cols{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:4px;padding:0 8px 8px;
+}
+.cond-col{display:flex;flex-direction:column;gap:3px}
+.cond-badge{
+  text-align:center;padding:4px 2px;font-size:0.62rem;
+  font-family:var(--mono);font-weight:700;border-radius:6px;letter-spacing:0.04em;
+}
+.cond-badge.rt{background:var(--rt-bg);color:var(--rt)}
+.cond-badge.c50{background:var(--c50-bg);color:var(--c50)}
+.cond-badge.c4{background:var(--c4-bg);color:var(--c4)}
+.cond-badge.cl{background:var(--cl-bg);color:var(--cl)}
+
+.param-sel{
+  width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;
+  padding:6px 4px;font-family:var(--thai);font-size:0.72rem;color:var(--text);
+  outline:none;-webkit-appearance:none;cursor:pointer;text-align:center;
+  line-height:1.3;min-height:36px;transition:all 0.15s;
+}
+.param-sel:focus{border-color:var(--green);background:#fff}
+.param-sel.ok{background:var(--green-lt);border-color:var(--green);color:var(--green)}
+.param-sel.caution{background:var(--amber-lt);border-color:var(--amber);color:var(--amber)}
+.param-sel.fail{background:var(--red-lt);border-color:var(--red);color:var(--red)}
+.param-sel.empty-required{border-color:var(--red);background:#fff5f5;animation:shake 0.4s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
+/* ══ NOTE PER CONDITION ══ */
+.notes-row{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:4px;padding:0 8px 10px;
+}
+.note-col{display:flex;flex-direction:column;gap:2px}
+.note-lbl{
+  font-size:0.58rem;text-align:center;font-family:var(--mono);font-weight:600;
+  padding:2px 0;border-radius:4px;letter-spacing:0.04em;
+}
+.note-lbl.rt{background:var(--rt-bg);color:var(--rt)}
+.note-lbl.c50{background:var(--c50-bg);color:var(--c50)}
+.note-lbl.c4{background:var(--c4-bg);color:var(--c4)}
+.note-lbl.cl{background:var(--cl-bg);color:var(--cl)}
+.note-inp{
+  width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:5px 5px;font-family:var(--thai);font-size:0.68rem;color:var(--text);
+  outline:none;resize:none;height:38px;transition:height 0.2s,border 0.15s;
+}
+.note-inp:focus{border-color:var(--muted);height:56px;background:#fff}
+
+/* ══ COLOR SUB ══ */
+.color-sub{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:4px;padding:0 8px 8px;
+}
+.color-sub-sel{
+  width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;
+  padding:4px 2px;font-family:var(--thai);font-size:0.65rem;color:var(--text);
+  outline:none;-webkit-appearance:none;text-align:center;
+}
+
+/* ══ AUTOFAIL BANNER ══ */
+.autofail-banner{
+  background:var(--red);color:#fff;
+  border-radius:10px;padding:10px 14px;margin-bottom:10px;
+  display:none;animation:fadeUp 0.2s;
+}
+.autofail-banner.show{display:block}
+.af-title{font-size:0.72rem;font-weight:700;letter-spacing:0.06em;margin-bottom:4px;font-family:var(--mono)}
+.af-item{font-size:0.76rem;padding:2px 0;opacity:0.9}
+
+/* ══ SCORE CARD ══ */
+.score-card{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:14px;margin-bottom:10px;
+}
+.score-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.score-label{font-size:0.65rem;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.1em}
+.grade-circle{
+  width:52px;height:52px;border-radius:50%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-weight:700;border:2px solid var(--border);
+}
+.gc-grade{font-size:1.4rem;font-family:var(--mono);line-height:1}
+.gc-word{font-size:0.5rem;font-family:var(--mono);letter-spacing:0.04em;margin-top:1px}
+.grade-circle.a,.grade-circle.b{border-color:var(--green);background:var(--green-lt);color:var(--green)}
+.grade-circle.c{border-color:var(--amber);background:var(--amber-lt);color:var(--amber)}
+.grade-circle.d{border-color:var(--red);background:var(--red-lt);color:var(--red)}
+.score-bars{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.score-bar-item{background:var(--bg);border-radius:8px;padding:8px 10px}
+.sbi-lbl{font-size:0.62rem;color:var(--muted);font-family:var(--mono);margin-bottom:4px;letter-spacing:0.06em}
+.sbi-bar{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.sbi-fill{height:100%;border-radius:3px;background:var(--green);transition:width 0.5s}
+.sbi-fill.low{background:var(--amber)}
+.sbi-fill.bad{background:var(--red)}
+.sbi-val{font-family:var(--mono);font-size:0.82rem;font-weight:600;margin-top:3px}
+.overall-row{display:flex;align-items:center;gap:10px}
+.overall-bar{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.overall-fill{height:100%;border-radius:4px;background:var(--green);transition:width 0.6s}
+.overall-fill.low{background:var(--amber)}
+.overall-fill.bad{background:var(--red)}
+.overall-num{font-family:var(--mono);font-size:0.9rem;font-weight:700;color:var(--text);white-space:nowrap}
+.verdict-line{margin-top:6px;font-size:0.78rem;font-weight:600}
+
+/* ══ W0 APPEARANCE CARD ══ */
+.w0app-card{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  margin-bottom:10px;overflow:hidden;
+}
+.w0app-hdr{
+  background:linear-gradient(135deg,#0d3320,#1a5c38);
+  padding:10px 14px;display:flex;justify-content:space-between;align-items:center;
+}
+.w0app-title{color:#fff;font-size:0.78rem;font-weight:600;display:flex;align-items:center;gap:6px}
+.w0app-badge{
+  background:rgba(255,255,255,0.15);color:#aee8c0;
+  border-radius:12px;padding:2px 10px;font-size:0.62rem;font-family:var(--mono);
+  border:1px solid rgba(255,255,255,0.2);cursor:pointer;
+}
+.w0app-badge.loading{animation:blink2 0.8s infinite}
+@keyframes blink2{0%,100%{opacity:1}50%{opacity:0.4}}
+.w0app-body{padding:10px 12px}
+.w0app-source{
+  display:flex;align-items:center;gap:6px;margin-bottom:8px;
+  background:var(--bg);border-radius:8px;padding:6px 10px;
+  border:1px solid var(--border);
+}
+.w0app-source input{
+  flex:1;background:transparent;border:none;outline:none;
+  font-family:var(--mono);font-size:0.72rem;color:var(--muted);
+}
+.w0app-fetch{
+  background:var(--green);color:#fff;border:none;border-radius:6px;
+  padding:4px 10px;font-size:0.68rem;font-family:var(--mono);cursor:pointer;
+  white-space:nowrap;font-weight:600;
+}
+.w0app-grid{display:grid;grid-template-columns:80px repeat(4,1fr);gap:0}
+.w0app-th{
+  font-size:0.6rem;font-family:var(--mono);font-weight:600;text-align:center;
+  padding:4px 2px;border-bottom:1px solid var(--border);
+}
+.w0app-th.rt{color:var(--rt);background:var(--rt-bg)}
+.w0app-th.c50{color:var(--c50);background:var(--c50-bg)}
+.w0app-th.c4{color:var(--c4);background:var(--c4-bg)}
+.w0app-th.cl{color:var(--cl);background:var(--cl-bg)}
+.w0app-th.lbl{background:var(--bg);color:var(--muted)}
+.w0app-row-lbl{
+  font-size:0.68rem;font-family:var(--mono);font-weight:600;
+  padding:5px 4px 5px 0;border-bottom:1px solid var(--border);
+  color:var(--text);display:flex;align-items:center;
+}
+.w0app-cell{
+  padding:4px 3px;border-bottom:1px solid var(--border);border-left:1px solid var(--border);
+  text-align:center;font-size:0.7rem;font-family:var(--thai);
+  background:var(--bg);color:var(--muted);min-height:30px;
+  display:flex;align-items:center;justify-content:center;line-height:1.3;
+}
+.w0app-cell.loaded{background:#f0f8f4;color:var(--green);font-weight:500;font-size:0.68rem}
+.w0app-cell.empty{background:#fafaf8;color:#bbb;font-style:italic;font-size:0.65rem}
+.w0app-row:last-child .w0app-cell,
+.w0app-row:last-child .w0app-row-lbl{border-bottom:none}
+.w0app-row{display:contents}
+.w0app-status{
+  margin-top:6px;font-size:0.65rem;font-family:var(--mono);
+  display:flex;align-items:center;gap:4px;color:var(--muted);
+}
+.w0app-status.ok{color:var(--green)}
+.w0app-status.err{color:var(--red)}
+/* ══ HISTORY PAGE ══ */
+.hist-page-hdr{
+  display:flex;align-items:center;gap:10px;margin-bottom:14px;padding:12px;
+  background:var(--card);border-radius:12px;border:1px solid var(--border);
+}
+.hist-sample-info h3{font-size:0.95rem;font-weight:600}
+.hist-sample-info p{font-size:0.72rem;color:var(--muted);font-family:var(--mono)}
+.hist-overview{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
+.hov-cell{background:var(--card);border-radius:10px;border:1px solid var(--border);padding:10px 8px;text-align:center}
+.hov-val{font-family:var(--mono);font-size:1.3rem;font-weight:700}
+.hov-val.green{color:var(--green)}
+.hov-val.red{color:var(--red)}
+.hov-val.amber{color:var(--amber)}
+.hov-lbl{font-size:0.58rem;color:var(--muted);font-family:var(--mono);letter-spacing:0.06em;margin-top:2px}
+
+/* History table */
+.hist-table-wrap{overflow-x:auto;margin-bottom:10px}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden;border:1px solid var(--border);font-size:0.75rem;min-width:420px}
+th{background:var(--text);color:#fff;padding:7px 8px;text-align:left;font-size:0.62rem;font-family:var(--mono);letter-spacing:0.06em;white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--bg)}
+.td-mono{font-family:var(--mono);font-size:0.72rem}
+.td-pass{color:var(--green);font-weight:700;font-family:var(--mono)}
+.td-fail{color:var(--red);font-weight:700;font-family:var(--mono)}
+.td-caution{color:var(--amber);font-weight:700;font-family:var(--mono)}
+.week-chip{
+  display:inline-block;padding:2px 8px;border-radius:12px;
+  font-family:var(--mono);font-size:0.68rem;font-weight:700;
+  background:var(--red);color:#fff;
+}
+
+/* History detail card */
+.hist-detail-card{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  margin-bottom:10px;overflow:hidden;
+}
+.hdc-header{
+  padding:10px 14px;display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid var(--border);
+}
+.hdc-week{font-family:var(--mono);font-size:0.9rem;font-weight:700}
+.hdc-grade{font-family:var(--mono);font-size:0.72rem;font-weight:700;padding:2px 10px;border-radius:12px}
+.hdc-grade.a,.hdc-grade.b{background:var(--green-lt);color:var(--green)}
+.hdc-grade.c{background:var(--amber-lt);color:var(--amber)}
+.hdc-grade.d{background:var(--red-lt);color:var(--red)}
+.hdc-params{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;padding:10px 14px}
+.hdc-param{background:var(--bg);border-radius:8px;padding:6px 8px}
+.hdc-plbl{font-size:0.6rem;color:var(--muted);font-family:var(--mono);letter-spacing:0.06em;margin-bottom:2px}
+.hdc-cond-row{display:flex;gap:3px;flex-wrap:wrap}
+.hdc-cond{font-size:0.65rem;padding:1px 5px;border-radius:4px;font-family:var(--thai)}
+.hdc-cond.ok{background:var(--green-lt);color:var(--green)}
+.hdc-cond.bad{background:var(--red-lt);color:var(--red)}
+.hdc-cond.mid{background:var(--amber-lt);color:var(--amber)}
+
+/* ══ VALIDATION ══ */
+.val-modal{
+  position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;
+  display:none;align-items:flex-end;
+}
+.val-modal.show{display:flex}
+.val-sheet{
+  background:#fff;width:100%;border-radius:20px 20px 0 0;
+  padding:20px 16px 30px;animation:slideUp 0.3s ease;
+}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.val-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 14px}
+.val-title{font-size:1rem;font-weight:700;color:var(--red);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.val-sub{font-size:0.8rem;color:var(--muted);margin-bottom:14px}
+.val-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 12px;background:var(--red-lt);border-radius:8px;
+  margin-bottom:6px;font-size:0.82rem;
+}
+.val-item-icon{font-size:1rem;flex-shrink:0}
+.val-close{
+  width:100%;background:var(--text);color:#fff;border:none;border-radius:12px;
+  padding:14px;font-family:var(--thai);font-size:0.95rem;font-weight:600;
+  cursor:pointer;margin-top:12px;
+}
+
+/* ══ SAVE BAR ══ */
+.save-bar{
+  position:fixed;bottom:0;left:0;right:0;z-index:200;
+  background:rgba(248,246,242,0.96);backdrop-filter:blur(12px);
+  border-top:1px solid var(--border);
+  padding:10px 12px 22px;
+  display:grid;grid-template-columns:auto 1fr auto;gap:8px;
+}
+.btn-icon{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  width:46px;height:46px;display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;cursor:pointer;
+}
+.btn-submit{
+  background:var(--red);color:#fff;border:none;border-radius:10px;
+  font-family:var(--thai);font-size:0.9rem;font-weight:700;
+  cursor:pointer;letter-spacing:0.02em;transition:all 0.2s;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.btn-submit:active{transform:scale(0.97)}
+.btn-submit.saving{background:var(--green)}
+.btn-submit.disabled{background:#ccc;cursor:not-allowed}
+
+/* ══ TOAST ══ */
+.toast{
+  position:fixed;top:110px;left:50%;transform:translateX(-50%) translateY(-8px);
+  background:var(--text);color:#fff;padding:9px 18px;border-radius:20px;
+  font-size:0.8rem;z-index:600;opacity:0;transition:all 0.25s;pointer-events:none;
+  white-space:nowrap;max-width:85vw;text-align:center;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ══ SAMPLE CAPTURE CARD ══ */
+.sc-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:14px;margin-bottom:10px;padding:14px 14px 12px;
+  box-shadow:0 1px 6px rgba(0,0,0,0.06);
+}
+.sc-title-row{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:12px;
+}
+.sc-title{
+  font-size:1.05rem;font-weight:700;color:var(--text);
+  letter-spacing:0.01em;
+}
+/* T checkbox */
+.sc-t-wrap{
+  display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
+}
+.sc-t-wrap input[type=checkbox]{display:none}
+.sc-t-box{
+  width:18px;height:18px;border:2px solid #bbb;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s;flex-shrink:0;
+}
+.sc-t-wrap input:checked + .sc-t-box{
+  background:var(--green);border-color:var(--green);
+}
+.sc-t-wrap input:checked + .sc-t-box::after{
+  content:'✓';color:#fff;font-size:0.75rem;font-weight:700;
+}
+.sc-t-lbl{font-size:0.85rem;font-weight:600;color:var(--text)}
+
+/* rows */
+.sc-row{
+  display:flex;align-items:center;gap:8px;margin-bottom:9px;
+}
+.sc-field-lbl{
+  font-size:0.75rem;font-weight:600;color:var(--green);
+  min-width:52px;text-align:right;flex-shrink:0;font-family:var(--mono);
+}
+.sc-field-lbl.lot{color:var(--red);font-size:0.82rem;font-weight:700}
+.sc-field-lbl.week{color:var(--red);font-size:0.78rem;font-weight:700;min-width:44px}
+
+/* inputs */
+.sc-inp{
+  border:1px solid var(--border);border-radius:7px;
+  padding:8px 10px;font-size:0.9rem;font-family:var(--mono);
+  color:var(--text);background:#fff;outline:none;
+  transition:border-color 0.2s;
+}
+.sc-inp:focus{border-color:var(--green)}
+.sc-inp-sample{flex:1;font-size:0.95rem;font-weight:600;letter-spacing:0.04em}
+.sc-inp.sc-inp-sample:focus{border-color:var(--green)}
+
+/* LOT selects */
+.sc-sel{
+  border:1px solid var(--border);border-radius:7px;
+  padding:8px 6px;font-size:0.88rem;font-family:var(--mono);
+  color:var(--text);background:#fff;outline:none;cursor:pointer;
+  -webkit-appearance:none;text-align:center;
+}
+.sc-sel:focus{border-color:var(--red)}
+.sc-yr{width:58px}
+.sc-mo{width:54px}
+.sc-lot-no{width:58px;text-align:center}
+.sc-lot-sfx{width:44px;text-align:center;font-weight:700;font-size:1rem}
+
+/* LOT bottom row */
+.sc-clear-row{
+  display:flex;align-items:center;gap:10px;margin-bottom:10px;
+  padding-left:60px;
+}
+.sc-clear-btn{
+  border:1.5px solid #bbb;border-radius:7px;background:#fff;
+  padding:6px 16px;font-size:0.8rem;font-weight:600;
+  color:var(--text);cursor:pointer;font-family:var(--thai);
+  transition:all 0.15s;
+}
+.sc-clear-btn:active{background:#f0f0f0;transform:scale(0.97)}
+.sc-lot-preview{
+  font-family:var(--mono);font-size:0.78rem;color:var(--muted);
+  background:var(--bg);border-radius:6px;padding:4px 10px;
+  letter-spacing:0.06em;flex:1;text-align:center;
+}
+.sc-lot-preview.filled{color:var(--green);font-weight:700;background:var(--green-lt)}
+
+/* bottom row — week + name */
+.sc-bottom-row{
+  display:flex;align-items:center;gap:10px;
+  border-top:1px solid var(--border);padding-top:10px;
+}
+.sc-week-wrap{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.sc-info{flex:1;min-width:0}
+.sc-info-name{
+  font-size:0.88rem;font-weight:600;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.sc-info-name.empty{color:var(--muted);font-size:0.78rem;font-style:italic;font-weight:400}
+.sc-info-code{font-size:0.7rem;color:var(--muted);font-family:var(--mono)}
+.sc-info-code.empty{color:#ccc}
+
+/* ══ PROGRESS BAR ══ */
+.progress-bar-wrap{margin:0 0 10px;background:var(--card);border-radius:10px;padding:10px 12px;border:1px solid var(--border)}
+.pb-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.pb-label{font-size:0.65rem;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.08em}
+.pb-pct{font-size:0.65rem;font-family:var(--mono);font-weight:700;color:var(--green)}
+.pb-track{height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.pb-fill{height:100%;background:var(--green);border-radius:3px;transition:width 0.3s}
+.pb-fields{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.pf-item{font-size:0.62rem;padding:2px 7px;border-radius:10px;font-family:var(--mono)}
+.pf-item.done{background:var(--green-lt);color:var(--green)}
+.pf-item.miss{background:var(--red-lt);color:var(--red)}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="logo">
+    <div class="logo-icon">STA</div>
+    <div>
+      <div class="logo-text">StaForm</div>
+      <div class="logo-sub">STABILITY TESTING</div>
+    </div>
+  </div>
+  <div class="hdr-actions">
+    <button class="hdr-btn" onclick="syncSheet()">⟳ Sync</button>
+    <button class="hdr-btn red" onclick="switchTab('hist')">📊 History</button>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab on" id="tab-form" onclick="switchTab('form')">📝 กรอกข้อมูล</div>
+  <div class="tab" id="tab-hist" onclick="switchTab('hist')">📅 Week History</div>
+</div>
+
+<!-- ══════════ PAGE: FORM ══════════ -->
+<div class="page on" id="page-form">
+
+  <!-- STICKY SAMPLE BAR — ตรึงไว้เมื่อ scroll -->
+  <div class="sticky-sample" id="stickySample">
+    <div class="ss-left">
+      <div class="ss-no empty" id="ssNo">— Sample No. —</div>
+      <div class="ss-name empty" id="ssName">กรอก Sample No. เพื่อเริ่มต้น</div>
+    </div>
+    <div class="ss-right">
+      <div class="ss-dot" id="ssDot"></div>
+      <select class="ss-week" id="ssWeekSel" onchange="onSsWeekChange()">
+        <option value="">Week?</option>
+        <option value="W0">W0</option>
+        <option value="W1">W1</option>
+        <option value="W2">W2</option>
+        <option value="W3">W3</option>
+        <option value="W4">W4</option>
+        <option value="W5">W5</option>
+        <option value="W6">W6</option>
+        <option value="W7">W7</option>
+        <option value="W8">W8</option>
+        <option value="1Y">1Y</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- SAMPLE CAPTURE CARD -->
+  <div class="sc-card">
+    <div class="sc-title-row">
+      <div class="sc-title">Sample Capture</div>
+      <label class="sc-t-wrap">
+        <input type="checkbox" id="tCheck" onchange="onTCheck()">
+        <span class="sc-t-box"></span>
+        <span class="sc-t-lbl">T</span>
+      </label>
+    </div>
+
+    <!-- Sample No (read/write) -->
+    <div class="sc-row">
+      <div class="sc-field-lbl">Sample</div>
+      <input class="sc-inp sc-inp-sample" id="sampleNo"
+             placeholder="Sample No"
+             oninput="onSampleInput()"
+             autocapitalize="characters" autocomplete="off">
+    </div>
+
+    <!-- LOT row -->
+    <div class="sc-row sc-lot-row">
+      <div class="sc-field-lbl lot">LOT</div>
+
+      <!-- Year ±2 (2-digit) -->
+      <select class="sc-sel sc-yr" id="lotYear" onchange="onLotChange()">
+      </select>
+
+      <!-- Month 01–12 -->
+      <select class="sc-sel sc-mo" id="lotMonth" onchange="onLotChange()">
+        <option value="">MM</option>
+      </select>
+
+      <!-- No — 3 digits -->
+      <input class="sc-inp sc-lot-no" id="lotNo"
+             placeholder="No" maxlength="3"
+             oninput="onLotChange()" type="text" inputmode="numeric">
+
+      <!-- Suffix — 1 char -->
+      <input class="sc-inp sc-lot-sfx" id="lotSfx"
+             placeholder="A" maxlength="1"
+             oninput="onLotChange()" autocapitalize="characters">
+    </div>
+
+    <!-- Clear LOT button -->
+    <div class="sc-clear-row">
+      <button class="sc-clear-btn" onclick="clearLot()">Clear LOT</button>
+      <div class="sc-lot-preview" id="lotPreview">—</div>
+    </div>
+
+    <!-- Week + Sample info -->
+    <div class="sc-bottom-row">
+      <div class="sc-week-wrap">
+        <div class="sc-field-lbl week">Week</div>
+        <select class="week-select" id="weekSel" onchange="onWeekSelChange()">
+          <option value="W0">W0</option>
+          <option value="W1">W1</option>
+          <option value="W2">W2</option>
+          <option value="W3">W3</option>
+          <option value="W4">W4</option>
+          <option value="W5">W5</option>
+          <option value="W6">W6</option>
+          <option value="W7">W7</option>
+          <option value="W8">W8</option>
+          <option value="1Y">1Y</option>
+          <option value="__custom__">อื่นๆ…</option>
+        </select>
+        <!-- custom week input — แสดงเมื่อเลือก "อื่นๆ" -->
+        <div id="weekCustomWrap" style="display:none;align-items:center;gap:4px;margin-top:4px">
+          <input id="weekCustom" class="sc-inp" placeholder="กรอก Week"
+                 style="width:90px;font-size:0.82rem;padding:5px 8px"
+                 oninput="onWeekChange()" autocomplete="off">
+        </div>
+        <div class="week-indicator">
+          <div class="week-dot" id="weekDot"></div>
+          <span id="weekStatus">—</span>
+        </div>
+      </div>
+      <div class="sc-info">
+        <div class="sc-info-name empty" id="dispName">— กรอก Sample No. —</div>
+        <div class="sc-info-code empty" id="dispCode">—</div>
+      </div>
+    </div>
+
+    <!-- RECORDER ROW -->
+    <div class="sc-row" style="border-top:1px solid var(--border);padding-top:10px;margin-top:2px">
+      <div class="sc-field-lbl" style="color:#555;min-width:72px">ผู้บันทึก</div>
+      <select class="sc-sel" id="recorderSel"
+              style="flex:1;text-align:left;padding-left:10px;border-radius:8px;font-size:0.88rem">
+      </select>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-bar-wrap">
+    <div class="pb-title">
+      <div class="pb-label">ความสมบูรณ์ของข้อมูล</div>
+      <div class="pb-pct" id="progPct">0%</div>
+    </div>
+    <div class="pb-track"><div class="pb-fill" id="progFill" style="width:0%"></div></div>
+    <div class="pb-fields" id="progFields"></div>
+  </div>
+
+  <!-- TIMELINE (mini) -->
+  <div class="timeline-wrap" id="timelineWrap" style="display:none">
+    <div class="tl-title">
+      <span>📅 Timepoints บันทึกแล้ว</span>
+      <span id="tlCount" style="color:var(--green)"></span>
+    </div>
+    <div class="tl-scroll" id="tlScroll"></div>
+  </div>
+
+  <!-- AUTO FAIL -->
+  <div class="autofail-banner" id="afBanner">
+    <div class="af-title">⚠ AUTO FAIL DETECTED</div>
+    <div id="afItems"></div>
+  </div>
+
+  <!-- W0 APPEARANCE FROM EXTERNAL SHEET -->
+  <div class="w0app-card" id="w0AppCard">
+    <div class="w0app-hdr">
+      <div class="w0app-title">🧪 Appearance W0 <span style="font-size:0.6rem;opacity:0.7;font-family:var(--mono)">(ดึงจาก Master Sheet)</span></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <div class="w0app-badge" id="w0FetchBtn" onclick="fetchW0Appearance()">⟳ ดึงข้อมูล W0</div>
+        <button class="w0-toggle" id="w0ToggleBtn" onclick="toggleW0()">▲ ย่อ</button>
+      </div>
+    </div>
+    <div class="w0app-body" id="w0AppBody">
+      <div class="w0app-source">
+        <span style="font-size:0.65rem;color:var(--muted);font-family:var(--mono);white-space:nowrap">Sheet URL</span>
+        <input id="masterSheetUrl" placeholder="วาง Google Sheet URL หรือ Sheet ID ที่นี่..." 
+               value="https://docs.google.com/spreadsheets/d/YOUR_MASTER_SHEET_ID">
+        <button class="w0app-fetch" onclick="fetchW0Appearance()">Fetch</button>
+      </div>
+      <div class="w0app-grid">
+        <div class="w0app-th lbl">Parameter</div>
+        <div class="w0app-th rt">RT</div>
+        <div class="w0app-th c50">50°C</div>
+        <div class="w0app-th c4">4°C</div>
+        <div class="w0app-th cl">Light</div>
+        <!-- rows injected by JS -->
+        <div class="w0app-row" id="w0AppRows"></div>
+      </div>
+      <div class="w0app-status" id="w0AppStatus">
+        <span>⚪</span><span>ยังไม่ได้ดึงข้อมูล — กด "ดึงข้อมูล W0" หรือ "Fetch"</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- pH -->
+  <div class="sec">
+    <div class="sec-hdr">
+      <div class="sec-title">pH &amp; Temperature</div>
+      <div class="sec-sub">Spec: pH 3.8–7.8 · เตือนถ้าออกนอก</div>
+    </div>
+    <div class="sec-body">
+      <div class="ph-grid">
+        <div class="ph-th label"></div>
+        <div class="ph-th rt">RT</div>
+        <div class="ph-th c50">50°C</div>
+        <div class="ph-th c4">4°C</div>
+        <div class="ph-th cl">Light</div>
+
+        <!-- W0 ref row -->
+        <div class="ph-cell row-lbl" id="w0lbl" style="display:none;font-size:0.58rem;color:var(--muted)">W0 ref</div>
+        <div class="ph-cell w0-ref" id="w0_rt" style="display:none">—</div>
+        <div class="ph-cell w0-ref" id="w0_50" style="display:none">—</div>
+        <div class="ph-cell w0-ref" id="w0_4" style="display:none">—</div>
+        <div class="ph-cell w0-ref" id="w0_cl" style="display:none">—</div>
+
+        <div class="ph-cell row-lbl">pH</div>
+        <div class="ph-cell"><input class="ph-inp" id="ph_rt" type="number" step="0.01" placeholder="—" oninput="onPhInput('rt')"></div>
+        <div class="ph-cell"><input class="ph-inp" id="ph_50" type="number" step="0.01" placeholder="—" oninput="onPhInput('50')"></div>
+        <div class="ph-cell"><input class="ph-inp" id="ph_4" type="number" step="0.01" placeholder="—" oninput="onPhInput('4')"></div>
+        <div class="ph-cell"><input class="ph-inp" id="ph_cl" type="number" step="0.01" placeholder="—" oninput="onPhInput('cl')"></div>
+
+        <div class="ph-cell row-lbl">Temp</div>
+        <div class="ph-cell"><input class="ph-inp" id="temp_rt" type="number" step="0.1" placeholder="—" oninput="calcProgress()"></div>
+        <div class="ph-cell"><input class="ph-inp" id="temp_50" type="number" step="0.1" placeholder="—" oninput="calcProgress()"></div>
+        <div class="ph-cell"><input class="ph-inp" id="temp_4" type="number" step="0.1" placeholder="—" oninput="calcProgress()"></div>
+        <div class="ph-cell"><input class="ph-inp" id="temp_cl" type="number" step="0.1" placeholder="—" oninput="calcProgress()"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PHYSICAL PARAMS -->
+  <div class="sec">
+    <div class="sec-hdr">
+      <div class="sec-title">Physical Evaluation</div>
+      <div class="sec-sub">เลือก 1 ตัวเลือกต่อสภาวะ + หมายเหตุแยก</div>
+    </div>
+    <div class="sec-body" id="physBody"></div>
+  </div>
+
+  <!-- SCORE -->
+  <div class="score-card">
+    <div class="score-top">
+      <div>
+        <div class="score-label">Stability Score</div>
+        <div class="verdict-line" id="verdictLine">กรอกข้อมูลเพื่อดูผล</div>
+      </div>
+      <div class="grade-circle" id="gradeCircle">
+        <div class="gc-grade" id="gcGrade">—</div>
+        <div class="gc-word" id="gcWord"></div>
+      </div>
+    </div>
+    <div class="score-bars">
+      <div class="score-bar-item">
+        <div class="sbi-lbl">PHYSICAL</div>
+        <div class="sbi-bar"><div class="sbi-fill" id="physFill" style="width:0%"></div></div>
+        <div class="sbi-val" id="physVal">—</div>
+      </div>
+      <div class="score-bar-item">
+        <div class="sbi-lbl">CHEMICAL</div>
+        <div class="sbi-bar"><div class="sbi-fill" id="chemFill" style="width:0%"></div></div>
+        <div class="sbi-val" id="chemVal">—</div>
+      </div>
+    </div>
+    <div class="overall-row">
+      <div class="overall-bar"><div class="overall-fill" id="overallFill" style="width:0%"></div></div>
+      <div class="overall-num" id="overallNum">— / 100</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════ PAGE: HISTORY ══════════ -->
+<div class="page" id="page-hist">
+
+  <div class="hist-page-hdr">
+    <div style="font-size:1.8rem">📊</div>
+    <div class="hist-sample-info">
+      <h3 id="histSampleName">— กรอก Sample No. ก่อน —</h3>
+      <p id="histSampleCode">เลือก Sample เพื่อดูประวัติ Stability</p>
+    </div>
+  </div>
+
+  <!-- Overview stats -->
+  <div class="hist-overview" id="histOverview">
+    <div class="hov-cell"><div class="hov-val" id="hovTotal">0</div><div class="hov-lbl">WEEKS</div></div>
+    <div class="hov-cell"><div class="hov-val green" id="hovPass">0</div><div class="hov-lbl">PASS</div></div>
+    <div class="hov-cell"><div class="hov-val amber" id="hovCaution">0</div><div class="hov-lbl">CAUTION</div></div>
+    <div class="hov-cell"><div class="hov-val red" id="hovFail">0</div><div class="hov-lbl">FAIL</div></div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="tl-title" style="padding:0 2px 6px;display:flex;justify-content:space-between">
+    <span style="font-size:0.65rem;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.1em">Stability Timeline</span>
+  </div>
+  <div class="tl-scroll" id="histTimeline" style="margin-bottom:12px"></div>
+
+  <!-- Summary Table -->
+  <div class="hist-table-wrap">
+    <table id="histTable">
+      <thead>
+        <tr>
+          <th>Week</th>
+          <th>pH RT</th>
+          <th>pH 50°C</th>
+          <th>Texture</th>
+          <th>Odor</th>
+          <th>Score</th>
+          <th>Grade</th>
+        </tr>
+      </thead>
+      <tbody id="histTbody">
+        <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">ยังไม่มีข้อมูล</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Detail cards per week -->
+  <div id="histCards"></div>
+</div>
+
+<!-- SAVE BAR -->
+<div class="save-bar">
+  <button class="btn-icon" onclick="saveDraft()" title="บันทึก Draft">📋</button>
+  <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">
+    <span>💾</span><span>ส่งข้อมูล &amp; บันทึก</span>
+  </button>
+  <button class="btn-icon" onclick="clearForm()" title="ล้างข้อมูล">🗑️</button>
+</div>
+
+<!-- VALIDATION MODAL -->
+<div class="val-modal" id="valModal">
+  <div class="val-sheet">
+    <div class="val-handle"></div>
+    <div class="val-title">⚠ กรอกข้อมูลไม่ครบ</div>
+    <div class="val-sub">กรุณากรอกข้อมูลที่จำเป็นก่อนส่ง</div>
+    <div id="valItems"></div>
+    <button class="val-close" onclick="document.getElementById('valModal').classList.remove('show')">รับทราบ — กลับไปกรอกต่อ</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════
+//  CONFIG
+// ═══════════════════════════
+// ═══════════════════════════════════════════════════════
+//  FIREBASE CONFIG
+//  ← วาง config จาก Firebase Console ที่นี่
+//    (Project Settings → Your apps → SDK setup)
+// ═══════════════════════════════════════════════════════
+cconst firebaseConfig = {
+
+  apiKey: "AIzaSyBj0VdrDx8Sf_gjm_hMPMEr2SXY0shcPaI",
+
+  authDomain: "rcn-check-stability-f8cdb.firebaseapp.com",
+
+  databaseURL: "https://rcn-check-stability-f8cdb-default-rtdb.asia-southeast1.firebasedatabase.app",
+
+  projectId: "rcn-check-stability-f8cdb",
+
+  storageBucket: "rcn-check-stability-f8cdb.firebasestorage.app",
+
+  messagingSenderId: "434384640638",
+
+  appId: "1:434384640638:web:f3f5552e06657762f0d62f"
+
+};
+
+
+// ── Demo mode: true = ใช้ mock data ไม่ต้อง Firebase จริง ──
+const DEMO_MODE = FIREBASE_CFG.apiKey === "YOUR_API_KEY";
+
+// ── Firebase references ──
+let fbApp = null, fbDB = null;
+if (!DEMO_MODE) {
+  fbApp = firebase.initializeApp(FIREBASE_CFG);
+  fbDB  = firebase.database();
+}
+
+// ── Firebase path helpers ──
+const FB = {
+  config    : () => fbDB.ref('config'),
+  dropdowns : () => fbDB.ref('config/dropdowns'),
+  recorders : () => fbDB.ref('config/recorders'),
+  w0        : (id) => fbDB.ref(`samples/${id}/w0`),
+  history   : (id) => fbDB.ref(`samples/${id}/history`),
+  rawData   : ()   => fbDB.ref('sta_raw'),
+  newRecord : ()   => fbDB.ref('sta_raw').push(),  // auto-key
+};
+
+// ── GAS_URL ยังใช้ได้สำหรับ getDropdowns/getRecorders fallback ──
+const GAS_URL = 'YOUR_APPS_SCRIPT_URL';
+
+const CONDS = ['rt','50','4','cl'];
+const COND_LBL = {rt:'RT', '50':'50°C', '4':'4°C', cl:'Light'};
+const COND_CLS = {rt:'rt', '50':'c50', '4':'c4', cl:'cl'};
+
+// ═══════════════════════════════════════════════════════
+//  SCORE SCALE (0–4) — แก้ label/คะแนนได้ที่ Sheet Score_Config
+//  s = คะแนนดิบ (0-4), lv = ระดับสี, af = auto-fail
+// ═══════════════════════════════════════════════════════
+const SCORE_OPTS = [
+  {s:4, l:'4 — ปกติ ไม่มีการเปลี่ยน',          lv:'ok',      verdict:'PASS ดีมาก', af:false},
+  {s:3, l:'3 — เปลี่ยนเล็กน้อย',                lv:'caution', verdict:'PASS',       af:false},
+  {s:2, l:'2 — เปลี่ยนชัด แต่ยังใช้ได้',         lv:'warn',    verdict:'เฝ้าระวัง',  af:false},
+  {s:1, l:'1 — เปลี่ยนมาก',                      lv:'fail',    verdict:'FAIL',       af:false},
+  {s:0, l:'0 — เสีย / แยกชั้น / กลิ่นเสีย',     lv:'fail',    verdict:'FAIL ทันที', af:true },
+];
+
+// ฟังก์ชันดึง score opts จาก Sheet (applySheetDropdowns จะอัปเดตนี้)
+// default ใช้ SCORE_OPTS เดียวกันทุก param
+const PARAMS = [
+  {id:'texture',  name:'ลักษณะเนื้อ',  eng:'Texture / Appearance', max:4, opts:[...SCORE_OPTS]},
+  {id:'spreading',name:'การ Spreading', eng:'Spreadability',         max:4, opts:[...SCORE_OPTS]},
+  {id:'opacity',  name:'ความทึบเนื้อ',  eng:'Opacity / Clarity',    max:4, opts:[...SCORE_OPTS]},
+  {id:'color',    name:'สี',            eng:'Color', max:4,
+   hasColorTone:true, opts:[...SCORE_OPTS],
+   colorTones:['ใสไม่มีสี (Clear)','ขาว','ขาวนวล','ครีม','เหลืองอ่อน','เหลือง','เหลืองเข้ม',
+               'น้ำตาลอ่อน','น้ำตาล','น้ำตาลเข้ม','ส้ม','ชมพูอ่อน','ชมพู','แดง',
+               'เขียวอ่อน','เขียว','เทา','ดำ']},
+  {id:'odor',     name:'กลิ่น',         eng:'Odor',                  max:4, opts:[...SCORE_OPTS]},
+];
+
+// ═══════════════════════════
+//  MOCK DATA
+// ═══════════════════════════
+const SAMPLES = {
+  'STA-001':{name:'Hydra Boost Serum 30%', code:'HBS-30-GEL'},
+  'STA-002':{name:'Niacinamide Toner 10%', code:'NIA-10-TON'},
+  'STA-003':{name:'Retinol Night Cream 0.5%', code:'RET-05-CRM'},
+};
+const MOCK_HIST = {
+  'STA-001':{
+    W0:{ph:{rt:'5.2','50':'5.2','4':'5.2',cl:'5.2'}, score:98, grade:'A',
+        texture:{rt:'ไม่เปลี่ยนแปลง','50':'ไม่เปลี่ยนแปลง','4':'ไม่เปลี่ยนแปลง',cl:'ไม่เปลี่ยนแปลง'},
+        odor:{rt:'ไม่เปลี่ยนแปลง','50':'ไม่เปลี่ยนแปลง','4':'ไม่เปลี่ยนแปลง',cl:'ไม่เปลี่ยนแปลง'}},
+    W1:{ph:{rt:'5.2','50':'5.3','4':'5.2',cl:'5.2'}, score:94, grade:'A',
+        texture:{rt:'ไม่เปลี่ยนแปลง','50':'ไม่เปลี่ยนแปลง','4':'ไม่เปลี่ยนแปลง',cl:'ไม่เปลี่ยนแปลง'},
+        odor:{rt:'ไม่เปลี่ยนแปลง','50':'กลิ่นอ่อนลงเล็กน้อย','4':'ไม่เปลี่ยนแปลง',cl:'ไม่เปลี่ยนแปลง'}},
+    W4:{ph:{rt:'5.2','50':'5.5','4':'5.2',cl:'5.3'}, score:78, grade:'B',
+        texture:{rt:'ไม่เปลี่ยนแปลง','50':'เหลวลงเล็กน้อย','4':'ไม่เปลี่ยนแปลง',cl:'ไม่เปลี่ยนแปลง'},
+        odor:{rt:'ไม่เปลี่ยนแปลง','50':'กลิ่นอ่อนลง','4':'ไม่เปลี่ยนแปลง',cl:'กลิ่นอ่อนลงเล็กน้อย'}},
+    W8:{ph:{rt:'5.3','50':'5.9','4':'5.2',cl:'5.4'}, score:45, grade:'D',
+        texture:{rt:'ไม่เปลี่ยนแปลง','50':'เหลวลง','4':'ไม่เปลี่ยนแปลง',cl:'เหลวลงเล็กน้อย'},
+        odor:{rt:'ไม่เปลี่ยนแปลง','50':'กลิ่นเปลี่ยน','4':'ไม่เปลี่ยนแปลง',cl:'กลิ่นอ่อนลง'}},
+  }
+};
+
+// ═══════════════════════════
+//  STATE
+// ═══════════════════════════
+let ST = {sampleNo:'', week:'W0', history:{}, sampleData:null};
+
+// ═══════════════════════════
+//  LOT — INIT & LOGIC
+// ═══════════════════════════
+function initLotDropdowns(){
+  const now    = new Date();
+  const curYbe = now.getFullYear() + 543;   // พ.ศ. ปัจจุบัน
+  const yrSel  = document.getElementById('lotYear');
+  yrSel.innerHTML = '<option value="">ปี</option>';
+  for(let y = curYbe - 2; y <= curYbe + 2; y++){
+    const opt = document.createElement('option');
+    const yy2 = String(y).slice(-2);   // 2 หลักท้าย เช่น 67,68,69
+    opt.value = yy2;
+    opt.textContent = yy2;
+    if(y === curYbe) opt.selected = true;
+    yrSel.appendChild(opt);
+  }
+  const moSel = document.getElementById('lotMonth');
+  moSel.innerHTML = '<option value="">MM</option>';
+  for(let m = 1; m <= 12; m++){
+    const opt = document.createElement('option');
+    const mm  = String(m).padStart(2,'0');
+    opt.value = mm; opt.textContent = mm;
+    if(m === now.getMonth() + 1) opt.selected = true;
+    moSel.appendChild(opt);
+  }
+  onLotChange();
+}
+
+function onLotChange(){
+  const yr  = document.getElementById('lotYear').value;
+  const mo  = document.getElementById('lotMonth').value;
+  let   no  = document.getElementById('lotNo').value.replace(/\D/g,'');
+  const sfx = document.getElementById('lotSfx').value.toUpperCase().replace(/[^A-Z]/g,'');
+
+  if(no) no = no.padStart(3,'0');
+  document.getElementById('lotNo').value  = no;
+  document.getElementById('lotSfx').value = sfx;
+
+  const prev = document.getElementById('lotPreview');
+  if(yr && mo && no){
+    const lotStr = yr + mo + no + sfx;
+    prev.textContent = 'LOT: ' + lotStr;
+    prev.classList.add('filled');
+  } else {
+    prev.textContent = '—';
+    prev.classList.remove('filled');
+  }
+}
+
+function onTCheck(){
+  // T checkbox → ค่า "T-" ใช้เป็น prefix ใน T_Flag field
+  ST.tFlag = document.getElementById('tCheck').checked ? 'T-' : '';
+}
+
+function clearLot(){
+  ['lotNo','lotSfx'].forEach(id => document.getElementById(id).value = '');
+  const prev = document.getElementById('lotPreview');
+  prev.textContent = '—';
+  prev.classList.remove('filled');
+  initLotDropdowns();
+}
+
+// ═══════════════════════════
+//  WEEK — รองรับ "อื่นๆ" + กรอกเอง
+// ═══════════════════════════
+function onWeekSelChange(){
+  const sel = document.getElementById('weekSel');
+  const customWrap = document.getElementById('weekCustomWrap');
+  if(sel.value === '__custom__'){
+    customWrap.style.display = 'flex';
+    document.getElementById('weekCustom').focus();
+  } else {
+    customWrap.style.display = 'none';
+    document.getElementById('weekCustom').value = '';
+    onWeekChange();
+  }
+}
+
+function getWeekValue(){
+  const sel = document.getElementById('weekSel');
+  if(sel.value === '__custom__'){
+    return document.getElementById('weekCustom').value.trim() || '';
+  }
+  return sel.value;
+}
+
+// ═══════════════════════════
+//  RECORDER — ชื่อผู้บันทึก
+// ═══════════════════════════
+// รายชื่อเริ่มต้น (จะถูกแทนด้วยข้อมูลจาก Sheet เมื่อ Sync)
+let RECORDERS = ['— เลือกผู้บันทึก —','ทีม QC 1','ทีม QC 2','ทีม QC 3'];
+
+function buildRecorderDropdown(list){
+  const sel = document.getElementById('recorderSel');
+  const cur = sel.value;
+  sel.innerHTML = '';
+  list.forEach((name, i) => {
+    const opt = document.createElement('option');
+    opt.value = i === 0 ? '' : name;
+    opt.textContent = name;
+    if(name === cur) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function applyRecorderList(names){
+  // names = string[] จาก Sheet
+  RECORDERS = ['— เลือกผู้บันทึก —', ...names];
+  buildRecorderDropdown(RECORDERS);
+  showToast('✅ รายชื่อผู้บันทึกอัปเดตแล้ว');
+}
+
+// ═══════════════════════════
+//  BUILD FORM
+// ═══════════════════════════
+function buildForm(){
+  const body = document.getElementById('physBody');
+  body.innerHTML = PARAMS.map(p => {
+    // Dropdowns per condition
+    const drops = CONDS.map(c => `
+      <div class="cond-col">
+        <div class="cond-badge ${COND_CLS[c]}">${COND_LBL[c]}</div>
+        <select class="param-sel" id="sel_${p.id}_${c}" onchange="onSel('${p.id}','${c}',this)">
+          <option value="">—</option>
+          ${p.opts.map(o=>`<option value="${o.l}" data-s="${o.s}" data-lv="${o.lv}" ${o.af?'data-af="1"':''}>${o.l}</option>`).join('')}
+        </select>
+        ${p.hasColorTone?`
+          <div style="margin-top:3px">
+            <select class="color-sub-sel" id="tone_${c}" title="โทนสี">
+              <option value="">โทนสี...</option>
+              ${p.colorTones.map(t=>`<option>${t}</option>`).join('')}
+            </select>
+          </div>`:''}
+      </div>`).join('');
+
+    // W0 reference
+    const w0cells = CONDS.map(c=>`<div class="w0-ref-cell" id="w0r_${p.id}_${c}">—</div>`).join('');
+
+    // Notes per condition
+    const notes = CONDS.map(c=>`
+      <div class="note-col">
+        <div class="note-lbl ${COND_CLS[c]}">${COND_LBL[c]}</div>
+        <textarea class="note-inp" id="note_${p.id}_${c}" placeholder="หมายเหตุ..." oninput="calcProgress()"></textarea>
+      </div>`).join('');
+
+    return `
+    <div class="param-blk">
+      <div class="param-name-bar">
+        <div>
+          <div class="param-name">${p.name}</div>
+          <div class="param-eng">${p.eng}</div>
+        </div>
+        <div class="param-score-badge" id="pscore_${p.id}">max ${p.max}pt</div>
+      </div>
+      <div class="w0-ref-row" id="w0row_${p.id}">
+        <div style="font-size:0.58rem;color:var(--muted);font-family:var(--mono);display:flex;align-items:center">↑W0</div>
+        ${w0cells}
+      </div>
+      <div class="cond-cols">${drops}</div>
+      <div style="padding:0 8px 4px;font-size:0.62rem;color:var(--muted);font-family:var(--mono);letter-spacing:0.06em">📝 หมายเหตุแยกสภาวะ</div>
+      <div class="notes-row">${notes}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════
+//  EVENTS
+// ═══════════════════════════
+function onSampleInput(){
+  const v = document.getElementById('sampleNo').value.toUpperCase();
+  document.getElementById('sampleNo').value = v;
+  ST.sampleNo = v;
+  const s = SAMPLES[v];
+  if(s){
+    document.getElementById('dispName').textContent = s.name;
+    document.getElementById('dispName').classList.remove('empty');
+    document.getElementById('dispCode').textContent = s.code;
+    document.getElementById('dispCode').classList.remove('empty');
+    ST.history = MOCK_HIST[v] || {};
+    ST.sampleData = s;
+    buildTimeline();
+    renderHistPage();
+    document.getElementById('histSampleName').textContent = s.name;
+    document.getElementById('histSampleCode').textContent = v + ' · ' + s.code;
+  } else {
+    document.getElementById('dispName').textContent = '— ไม่พบข้อมูล —';
+    document.getElementById('dispName').classList.add('empty');
+    document.getElementById('dispCode').textContent = '—';
+    ST.history = {};
+  }
+  syncStickyBar();
+  calcProgress();
+}
+
+function onWeekChange(){
+  const w = getWeekValue();
+  ST.week = w;
+  const dot = document.getElementById('weekDot');
+  const ws  = document.getElementById('weekStatus');
+  if(!w){ ws.textContent='—'; dot.className='week-dot'; return; }
+  const hasData = ST.history[w];
+  dot.className = 'week-dot '+(hasData?'has':'');
+  ws.textContent = hasData ? 'มีข้อมูลแล้ว' : 'ยังไม่มีข้อมูล';
+  if(hasData) loadWeekIntoForm(w);
+  if(w !== 'W0' && ST.history['W0']) showW0Refs();
+  highlightTimeline(w);
+  syncStickyBar();
+  calcProgress();
+}
+
+function onSel(pid, cond, sel){
+  const opt = sel.selectedOptions[0];
+  const lv = opt.dataset.lv || '';
+  sel.className = 'param-sel';
+  if(sel.value){
+    if(lv==='fail') sel.classList.add('fail');
+    else if(lv==='warn'||lv==='caution') sel.classList.add('caution');
+    else sel.classList.add('ok');
+  }
+  updateScore();
+  checkAutoFail();
+  calcProgress();
+}
+
+function onPhInput(c){
+  const el = document.getElementById('ph_'+c);
+  const v = parseFloat(el.value);
+  const w0 = ST.history['W0'] && ST.history['W0'].ph ? parseFloat(ST.history['W0'].ph[c]||0) : null;
+  el.className = 'ph-inp';
+  if(!el.value) return;
+  if(v < 3.8 || v > 7.8){ el.className='ph-inp fail'; }
+  else if(w0 && Math.abs(v-w0)>0.5){ el.className='ph-inp warn'; }
+  else if(w0 && Math.abs(v-w0)>0.3){ el.className='ph-inp warn'; }
+  else { el.className='ph-inp ok'; }
+  updateScore();
+  checkAutoFail();
+  calcProgress();
+}
+
+// ═══════════════════════════
+//  W0 REFS
+// ═══════════════════════════
+function showW0Refs(){
+  const w0 = ST.history['W0'];
+  if(!w0) return;
+  // pH refs
+  const show = (id,v) => {const e=document.getElementById(id);if(e){e.textContent=v||'—';e.style.display=''}};
+  show('w0lbl'); show('w0_rt',w0.ph&&w0.ph.rt); show('w0_50',w0.ph&&w0.ph['50']); show('w0_4',w0.ph&&w0.ph['4']); show('w0_cl',w0.ph&&w0.ph.cl);
+  document.getElementById('w0lbl').style.display='';
+  // Param refs
+  PARAMS.forEach(p=>{
+    if(!w0[p.id]) return;
+    document.getElementById('w0row_'+p.id).classList.add('show');
+    CONDS.forEach(c=>{
+      const cell = document.getElementById('w0r_'+p.id+'_'+c);
+      if(cell) cell.textContent = w0[p.id][c]||'—';
+    });
+  });
+}
+
+// ═══════════════════════════
+//  LOAD WEEK DATA INTO FORM
+// ═══════════════════════════
+function loadWeekIntoForm(w){
+  const d = ST.history[w];
+  if(!d) return;
+  if(d.ph){
+    CONDS.forEach(c=>{
+      const el=document.getElementById('ph_'+c);
+      if(el&&d.ph[c]){el.value=d.ph[c];onPhInput(c);}
+    });
+  }
+  PARAMS.forEach(p=>{
+    if(!d[p.id]) return;
+    CONDS.forEach(c=>{
+      const sel=document.getElementById('sel_'+p.id+'_'+c);
+      if(sel&&d[p.id][c]){sel.value=d[p.id][c];onSel(p.id,c,sel);}
+    });
+  });
+  showToast('📅 โหลดข้อมูล '+w+' แล้ว');
+}
+
+// ═══════════════════════════
+//  TIMELINE
+// ═══════════════════════════
+const ALL_WEEKS=['W0','W1','W2','W3','W4','W5','W6','W7','W8','1Y'];
+
+function buildTimeline(){
+  const weeks = ALL_WEEKS.filter(w=>ST.history[w]);
+  const wrap = document.getElementById('timelineWrap');
+  if(!weeks.length){ wrap.style.display='none'; return; }
+  wrap.style.display='';
+  document.getElementById('tlCount').textContent = weeks.length+' weeks';
+  const scr = document.getElementById('tlScroll');
+  scr.innerHTML = weeks.map((w,i)=>{
+    const d=ST.history[w];
+    const g=(d.grade||'').toLowerCase();
+    const cls = g==='d'?'fail':g==='c'?'caution':d.score?'has-data':'';
+    return `<div class="tl-item ${i>0?'tl-line':''}" onclick="jumpWeek('${w}')">
+      <div class="tl-circle ${cls}" id="tlc_${w}">
+        <div class="tl-week">${w}</div>
+        ${d.grade?`<div class="tl-grade ${g}">${d.grade}</div>`:''}
+      </div>
+      <div class="tl-label">${d.score||'—'}</div>
+    </div>`;
+  }).join('');
+}
+
+function highlightTimeline(w){
+  document.querySelectorAll('.tl-circle').forEach(c=>c.classList.remove('active'));
+  const el=document.getElementById('tlc_'+w);
+  if(el) el.classList.add('active');
+}
+
+function jumpWeek(w){
+  document.getElementById('weekSel').value=w;
+  onWeekChange();
+  switchTab('form');
+}
+
+// ═══════════════════════════
+//  STICKY BAR — sync กับ form
+// ═══════════════════════════
+function syncStickyBar(){
+  const no   = ST.sampleNo;
+  const name = document.getElementById('dispName').textContent;
+  const week = document.getElementById('weekSel').value;
+  const hasData = week && ST.history[week];
+
+  const ssNo   = document.getElementById('ssNo');
+  const ssName = document.getElementById('ssName');
+  const ssDot  = document.getElementById('ssDot');
+  const ssWeek = document.getElementById('ssWeekSel');
+
+  if(no && !document.getElementById('dispName').classList.contains('empty')){
+    ssNo.textContent = no;   ssNo.classList.remove('empty');
+    ssName.textContent = name; ssName.classList.remove('empty');
+  } else {
+    ssNo.textContent = '— Sample No. —'; ssNo.classList.add('empty');
+    ssName.textContent = 'กรอก Sample No. เพื่อเริ่มต้น'; ssName.classList.add('empty');
+  }
+  ssWeek.value = week || '';
+  ssDot.className = 'ss-dot' + (hasData?' has':'') +
+    (hasData&&(ST.history[week].grade==='D')?' fail':'');
+}
+
+// เมื่อเลือก Week จาก sticky bar — sync กลับไปที่ form จริง
+function onSsWeekChange(){
+  const w = document.getElementById('ssWeekSel').value;
+  document.getElementById('weekSel').value = w;
+  onWeekChange();
+}
+
+// ═══════════════════════════
+//  W0 COLLAPSE TOGGLE
+// ═══════════════════════════
+let w0Collapsed = false;
+function toggleW0(){
+  const body = document.getElementById('w0AppBody');
+  const btn  = document.getElementById('w0ToggleBtn');
+  w0Collapsed = !w0Collapsed;
+  if(w0Collapsed){
+    body.classList.add('collapsed');
+    btn.textContent = '▼ ขยาย';
+  } else {
+    body.classList.remove('collapsed');
+    btn.textContent = '▲ ย่อ';
+  }
+}
+// ═══════════════════════════
+const W0_PARAM_LABELS = [
+  {id:'texture',label:'ลักษณะเนื้อ'},
+  {id:'spreading',label:'Spreading'},
+  {id:'opacity',label:'ความทึบ'},
+  {id:'color',label:'สี'},
+  {id:'odor',label:'กลิ่น'},
+  {id:'ph',label:'pH'},
+];
+const MOCK_W0_MASTER = {
+  'STA-001':{
+    texture:{rt:'เนื้อเนียน ใส','50':'เนื้อเนียน ใส','4':'เนื้อเนียน ใส',cl:'เนื้อเนียน ใส'},
+    spreading:{rt:'เกลี่ยง่าย','50':'เกลี่ยง่าย','4':'เกลี่ยง่าย',cl:'เกลี่ยง่าย'},
+    opacity:{rt:'ใสเล็กน้อย','50':'ใสเล็กน้อย','4':'ใสเล็กน้อย',cl:'ใสเล็กน้อย'},
+    color:{rt:'ใสไม่มีสี','50':'ใสไม่มีสี','4':'ใสไม่มีสี',cl:'ใสไม่มีสี'},
+    odor:{rt:'หอมอ่อนๆ','50':'หอมอ่อนๆ','4':'หอมอ่อนๆ',cl:'หอมอ่อนๆ'},
+    ph:{rt:'5.2','50':'5.2','4':'5.2',cl:'5.2'},
+  },
+  'STA-002':{
+    texture:{rt:'น้ำ ใส','50':'น้ำ ใส','4':'น้ำ ใส',cl:'น้ำ ใส'},
+    spreading:{rt:'ลื่นดี','50':'ลื่นดี','4':'ลื่นดี',cl:'ลื่นดี'},
+    opacity:{rt:'ใสมาก','50':'ใสมาก','4':'ใสมาก',cl:'ใสมาก'},
+    color:{rt:'ใสไม่มีสี','50':'ใสไม่มีสี','4':'ใสไม่มีสี',cl:'ใสไม่มีสี'},
+    odor:{rt:'ไม่มีกลิ่น','50':'ไม่มีกลิ่น','4':'ไม่มีกลิ่น',cl:'ไม่มีกลิ่น'},
+    ph:{rt:'6.5','50':'6.5','4':'6.5',cl:'6.5'},
+  }
+};
+
+async function fetchW0Appearance(){
+  if(!ST.sampleNo){showToast('⚠ กรอก Sample No. ก่อน');return;}
+  const btn=document.getElementById('w0FetchBtn');
+  const status=document.getElementById('w0AppStatus');
+  btn.classList.add('loading');btn.textContent='⟳ กำลังดึง...';
+  status.className='w0app-status';status.innerHTML='<span>⟳</span><span>กำลังเชื่อมต่อ Master Sheet...</span>';
+  try{
+    // จริงๆ: const res=await fetch(GAS_URL+'?action=getW0&id='+ST.sampleNo); const data=await res.json();
+    await new Promise(r=>setTimeout(r,1200));
+    const data=MOCK_W0_MASTER[ST.sampleNo];
+    if(!data) throw new Error('ไม่พบข้อมูล W0 ใน Master Sheet');
+    if(!ST.history['W0']) ST.history['W0']={};
+    Object.assign(ST.history['W0'], data);
+    renderW0AppGrid(data);
+    status.className='w0app-status ok';
+    status.innerHTML=`<span>✅</span><span>ดึงข้อมูล W0 สำเร็จ · ${new Date().toLocaleTimeString('th-TH')}</span>`;
+    showW0Refs();
+    showToast('✅ โหลด W0 Appearance แล้ว');
+  }catch(e){
+    status.className='w0app-status err';
+    status.innerHTML=`<span>❌</span><span>${e.message}</span>`;
+    showToast('⚠ '+e.message);
+  }
+  btn.classList.remove('loading');btn.textContent='⟳ ดึงข้อมูล W0';
+}
+
+function renderW0AppGrid(data){
+  const container=document.getElementById('w0AppRows');
+  container.innerHTML=W0_PARAM_LABELS.map(p=>{
+    const pd=data[p.id];
+    const cells=CONDS.map(c=>{
+      const v=pd?(pd[c]||'—'):'—';
+      return `<div class="w0app-cell ${!pd||!pd[c]?'empty':'loaded'}">${v}</div>`;
+    }).join('');
+    return `<div class="w0app-row-lbl">${p.label}</div>${cells}`;
+  }).join('');
+}
+
+// ═══════════════════════════
+//  HISTORY PAGE — CHRONOLOGICAL W0→W1→...→1Y
+// ═══════════════════════════
+function renderHistPage(){
+  // Strictly chronological order
+  const WEEK_ORDER=['W0','W1','W2','W3','W4','W5','W6','W7','W8','1Y'];
+  const weeks=WEEK_ORDER.filter(w=>ST.history[w]);
+
+  let pass=0,caution=0,fail=0;
+  weeks.forEach(w=>{
+    const g=(ST.history[w].grade||'').toUpperCase();
+    if(g==='A'||g==='B') pass++;
+    else if(g==='C') caution++;
+    else if(g==='D') fail++;
+  });
+  document.getElementById('hovTotal').textContent=weeks.length;
+  document.getElementById('hovPass').textContent=pass;
+  document.getElementById('hovCaution').textContent=caution;
+  document.getElementById('hovFail').textContent=fail;
+
+  // Timeline — left=W0, right=latest
+  const tl=document.getElementById('histTimeline');
+  tl.innerHTML=weeks.map((w,i)=>{
+    const d=ST.history[w];
+    const g=(d.grade||'').toLowerCase();
+    const cls=g==='d'?'fail':g==='c'?'caution':d.score?'has-data':'';
+    return `<div class="tl-item ${i>0?'tl-line':''}" onclick="jumpWeek('${w}')">
+      <div class="tl-circle ${cls}" id="htlc_${w}">
+        <div class="tl-week">${w}</div>
+        ${d.grade?`<div class="tl-grade ${g}">${d.grade}</div>`:''}
+      </div>
+      <div class="tl-label">${d.score?d.score+'pt':'—'}</div>
+    </div>`;
+  }).join('');
+
+  // Summary table — W0 on top, latest at bottom
+  const tbody=document.getElementById('histTbody');
+  if(!weeks.length){
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">ยังไม่มีข้อมูล</td></tr>';
+  } else {
+    tbody.innerHTML=weeks.map(w=>{
+      const d=ST.history[w];
+      const g=(d.grade||'').toUpperCase();
+      const gcls=g==='A'||g==='B'?'td-pass':g==='D'?'td-fail':'td-caution';
+      const phRt=d.ph?d.ph.rt:'—';
+      const ph50=d.ph?d.ph['50']:'—';
+      const texRt=d.texture?d.texture.rt:'—';
+      const odRt=d.odor?d.odor.rt:'—';
+      const phBad=phRt!=='—'&&(parseFloat(phRt)<3.8||parseFloat(phRt)>7.8);
+      return `<tr>
+        <td><div class="week-chip">${w}</div></td>
+        <td class="td-mono ${phBad?'td-fail':''}">${phRt}</td>
+        <td class="td-mono">${ph50}</td>
+        <td style="font-size:0.68rem">${texRt.length>10?texRt.slice(0,9)+'…':texRt}</td>
+        <td style="font-size:0.68rem">${odRt.length>10?odRt.slice(0,9)+'…':odRt}</td>
+        <td class="td-mono">${d.score||'—'}</td>
+        <td class="${gcls}">${g||'—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Detail cards — W0 on top, W1 next, ... chronological
+  const cards=document.getElementById('histCards');
+  cards.innerHTML=weeks.map(w=>{
+    const d=ST.history[w];
+    const g=(d.grade||'').toLowerCase();
+    const phRt=d.ph?d.ph.rt:'—';
+    const ph50=d.ph?d.ph['50']:'—';
+    const phBad=phRt!=='—'&&(parseFloat(phRt)<3.8||parseFloat(phRt)>7.8);
+    const paramSummary=PARAMS.map(p=>{
+      const pd=d[p.id];if(!pd) return '';
+      return `<div class="hdc-param">
+        <div class="hdc-plbl">${p.name}</div>
+        <div class="hdc-cond-row">
+          ${CONDS.map(c=>{
+            const v=pd[c]||'—';
+            const isBad=v.includes('แยก')||v.includes('หืน')||v.includes('ตกตะกอน')||v.includes('ไม่สามารถ')||v.includes('ชั้นใส');
+            const isMid=v!=='ไม่เปลี่ยนแปลง'&&!isBad&&v!=='—';
+            return `<div class="hdc-cond ${isBad?'bad':isMid?'mid':'ok'}" title="${COND_LBL[c]}: ${v}">${COND_LBL[c]}</div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('');
+    return `
+    <div class="hist-detail-card">
+      <div class="hdc-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="week-chip">${w}</div>
+          <div style="font-size:0.75rem;color:var(--muted)">
+            pH RT:<span class="td-mono ${phBad?'td-fail':''}" style="margin-left:3px">${phRt}</span>
+            &nbsp;50°C:<span class="td-mono" style="margin-left:3px">${ph50}</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="hdc-grade ${g}">${d.grade||'?'} · ${d.score||'?'}pt</div>
+          <button onclick="jumpWeek('${w}')" style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:0.65rem;cursor:pointer">📝 แก้ไข</button>
+        </div>
+      </div>
+      <div class="hdc-params">${paramSummary}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════
+//  AUTO FAIL
+// ═══════════════════════════
+function checkAutoFail(){
+  const fails=[];
+  PARAMS.forEach(p=>{
+    CONDS.forEach(c=>{
+      const sel=document.getElementById('sel_'+p.id+'_'+c);
+      if(!sel) return;
+      const opt=sel.selectedOptions[0];
+      if(opt&&opt.dataset.af==='1') fails.push(`${p.name} [${COND_LBL[c]}]: ${sel.value}`);
+    });
+  });
+  CONDS.forEach(c=>{
+    const el=document.getElementById('ph_'+c);
+    if(el&&el.classList.contains('fail')&&el.value) fails.push(`pH [${COND_LBL[c]}]: ${el.value} ออกนอก Spec`);
+  });
+  const banner=document.getElementById('afBanner');
+  const items=document.getElementById('afItems');
+  if(fails.length){
+    banner.classList.add('show');
+    items.innerHTML=fails.map(f=>`<div class="af-item">• ${f}</div>`).join('');
+  } else banner.classList.remove('show');
+}
+
+// ═══════════════════════════════════════════════════════
+//  SCORE — คำนวณจาก 0-4 scale
+//  Raw data บันทึกลง Sheet ก่อน — Sheet คำนวณสรุปเอง
+//  Weight: Physical 55% / Chemical 45% (ปรับใน Score_Config)
+// ═══════════════════════════════════════════════════════
+// config ที่โหลดจาก Sheet (หรือ default)
+let SCORE_CFG = {
+  physWeight : 55,   // % ของ Physical
+  chemWeight : 45,   // % ของ Chemical
+  grade      : [{g:'A',min:90},{g:'B',min:75},{g:'C',min:60},{g:'D',min:0}],
+  phMin      : 3.8,
+  phMax      : 7.8,
+  phWarnDelta: 0.3,
+  phFailDelta: 0.5,
+};
+
+function updateScore(){
+  let physScore=0, physMax=0, anyAF=false, anySel=0;
+  PARAMS.forEach(p=>{
+    let sum=0, cnt=0;
+    CONDS.forEach(c=>{
+      const sel=document.getElementById('sel_'+p.id+'_'+c);
+      if(!sel||!sel.value) return;
+      cnt++; anySel++;
+      const s=parseInt(sel.selectedOptions[0].dataset.s||0);
+      if(sel.selectedOptions[0].dataset.af==='1') anyAF=true;
+      sum+=s;
+    });
+    if(cnt){ physScore+=sum/cnt; physMax+=p.max; }
+    // update param badge — แสดง avg score / max
+    const badge=document.getElementById('pscore_'+p.id);
+    if(badge && cnt){
+      const avg=sum/cnt;
+      badge.textContent = avg.toFixed(1)+'/'+p.max;
+      badge.style.background = avg>=3?'var(--green-lt)':avg>=2?'var(--amber-lt)':'var(--red-lt)';
+      badge.style.color       = avg>=3?'var(--green)':avg>=2?'var(--amber)':'var(--red)';
+    }
+  });
+
+  // pH scoring (0-4 equivalent)
+  let chemScore=0, phCnt=0;
+  CONDS.forEach(c=>{
+    const el=document.getElementById('ph_'+c);
+    if(!el||!el.value) return;
+    phCnt++;
+    const v   = parseFloat(el.value);
+    const w0v = ST.history['W0']&&ST.history['W0'].ph ? parseFloat(ST.history['W0'].ph[c]||v) : v;
+    const diff= Math.abs(v-w0v);
+    if(v<SCORE_CFG.phMin||v>SCORE_CFG.phMax){ anyAF=true; chemScore+=0; }
+    else if(diff<0.1)                         chemScore+=4;
+    else if(diff<SCORE_CFG.phWarnDelta)       chemScore+=3;
+    else if(diff<SCORE_CFG.phFailDelta)       chemScore+=2;
+    else                                      { anyAF=true; chemScore+=0; }
+  });
+  if(phCnt) chemScore=chemScore/phCnt;
+
+  if(anySel===0&&!phCnt){ resetScore(); return; }
+
+  const wP=SCORE_CFG.physWeight/100;
+  const wC=SCORE_CFG.chemWeight/100;
+  const physPct = physMax ? physScore/physMax*100 : 0;
+  const chemPct = phCnt  ? chemScore/4*100        : 0;
+  const overall  = anyAF ? 0 : Math.round(physPct*wP + chemPct*wC);
+
+  let grade='D', word='FAIL', cls='d';
+  if(!anyAF){
+    for(const g of SCORE_CFG.grade){
+      if(overall>=g.min){ grade=g.g; cls=g.g.toLowerCase(); break; }
+    }
+    if(grade==='A')      word='EXCELLENT';
+    else if(grade==='B') word='PASS';
+    else if(grade==='C') word='เฝ้าระวัง';
+  }
+
+  const physP=Math.round(physPct);
+  const chemP=Math.round(chemPct);
+  // Update UI
+  document.getElementById('gcGrade').textContent=grade;
+  document.getElementById('gcWord').textContent=word;
+  const gc=document.getElementById('gradeCircle');
+  gc.className='grade-circle '+cls;
+  document.getElementById('verdictLine').textContent=
+    anyAF?'⚠ Auto Fail — ตรวจสอบด่วน':
+    overall>=90?'✅ PASS — Excellent':
+    overall>=75?'✅ PASS — Good':
+    overall>=60?'⚠ CAUTION — ติดตามต่อ':'❌ FAIL — ทบทวนสูตร';
+  document.getElementById('verdictLine').style.color=anyAF||overall<60?'var(--red)':overall<75?'var(--amber)':'var(--green)';
+  setBar('physFill',physP);
+  setBar('chemFill',chemP);
+  const oFill=document.getElementById('overallFill');
+  oFill.style.width=(anyAF?100:overall)+'%';
+  oFill.className='overall-fill'+(anyAF||overall<60?' bad':overall<75?' low':'');
+  document.getElementById('physVal').textContent=physP+'%';
+  document.getElementById('chemVal').textContent=phCnt?chemP+'%':'—';
+  document.getElementById('overallNum').textContent=(anyAF?'AUTO FAIL':overall)+(!anyAF?' / 100':'');
+}
+
+function setBar(id,pct){
+  const el=document.getElementById(id);
+  el.style.width=pct+'%';
+  el.className='sbi-fill'+(pct<60?' bad':pct<75?' low':'');
+}
+
+function resetScore(){
+  ['gcGrade','gcWord'].forEach(id=>document.getElementById(id).textContent='');
+  document.getElementById('gcGrade').textContent='—';
+  document.getElementById('gradeCircle').className='grade-circle';
+  document.getElementById('verdictLine').textContent='กรอกข้อมูลเพื่อดูผล';
+  document.getElementById('verdictLine').style.color='';
+  ['physFill','chemFill','overallFill'].forEach(id=>document.getElementById(id).style.width='0%');
+  document.getElementById('physVal').textContent='—';
+  document.getElementById('chemVal').textContent='—';
+  document.getElementById('overallNum').textContent='— / 100';
+}
+
+// ═══════════════════════════
+//  PROGRESS
+// ═══════════════════════════
+function calcProgress(){
+  const checks=[
+    {id:'sampleNo', label:'Sample No.', ok:()=>!!document.getElementById('sampleNo').value},
+    {id:'week', label:'Week', ok:()=>!!document.getElementById('weekSel').value},
+    {id:'ph', label:'pH', ok:()=>CONDS.some(c=>document.getElementById('ph_'+c).value)},
+    ...PARAMS.map(p=>({
+      id:p.id, label:p.name,
+      ok:()=>CONDS.some(c=>document.getElementById('sel_'+p.id+'_'+c)&&document.getElementById('sel_'+p.id+'_'+c).value)
+    }))
+  ];
+  const done=checks.filter(c=>c.ok()).length;
+  const pct=Math.round(done/checks.length*100);
+  document.getElementById('progPct').textContent=pct+'%';
+  document.getElementById('progFill').style.width=pct+'%';
+  document.getElementById('progFields').innerHTML=checks.map(c=>`
+    <div class="pf-item ${c.ok()?'done':'miss'}">${c.ok()?'✓':'!'} ${c.label}</div>`).join('');
+}
+
+// ═══════════════════════════
+//  VALIDATION & SUBMIT
+// ═══════════════════════════
+function handleSubmit(){
+  const missing=[];
+  if(!document.getElementById('sampleNo').value) missing.push({icon:'🧪', txt:'Sample No. ยังไม่ได้กรอก'});
+  if(!document.getElementById('weekSel').value) missing.push({icon:'📅', txt:'ยังไม่ได้เลือก Week'});
+  const hasAnyPh=CONDS.some(c=>document.getElementById('ph_'+c).value);
+  if(!hasAnyPh) missing.push({icon:'⚗️', txt:'ยังไม่ได้กรอกค่า pH เลย'});
+  PARAMS.forEach(p=>{
+    const hasAny=CONDS.some(c=>document.getElementById('sel_'+p.id+'_'+c).value);
+    if(!hasAny) missing.push({icon:'📋', txt:`"${p.name}" ยังไม่ได้เลือกสภาวะใดเลย`});
+  });
+  if(missing.length){
+    const items=document.getElementById('valItems');
+    items.innerHTML=missing.map(m=>`<div class="val-item"><div class="val-item-icon">${m.icon}</div><div>${m.txt}</div></div>`).join('');
+    document.getElementById('valModal').classList.add('show');
+    return;
+  }
+  saveToSheet();
+}
+
+async function saveToSheet(){
+  const btn = document.getElementById('submitBtn');
+  btn.classList.add('saving');
+  btn.innerHTML = '<span>⏳</span><span>กำลังบันทึก...</span>';
+
+  // ── รวบรวม payload ──────────────────────────────────
+  const lotNo = (() => {
+    const yr=document.getElementById('lotYear').value;
+    const mo=document.getElementById('lotMonth').value;
+    const no=document.getElementById('lotNo').value;
+    const sfx=document.getElementById('lotSfx').value;
+    return (yr&&mo&&no) ? yr+mo+no+sfx : '';
+  })();
+
+  const payload = {
+    sampleNo   : ST.sampleNo,
+    sampleName : document.getElementById('dispName').textContent,
+    week       : getWeekValue(),
+    lot        : lotNo,
+    no_        : ST.tFlag || '',       // "T-" หรือ ""
+    recorder   : document.getElementById('recorderSel').value || '—',
+    timestamp  : new Date().toISOString(),
+    savedAt    : Date.now(),           // Firebase timestamp (ms)
+    ph:{}, temp:{}, params:{}, notes:{}, colorTones:{},
+    synced     : false,                // Apps Script จะเปลี่ยนเป็น true หลัง sync ลง Sheets
+  };
+
+  CONDS.forEach(c => {
+    payload.ph[c]   = document.getElementById('ph_'+c).value   || '';
+    payload.temp[c] = document.getElementById('temp_'+c).value || '';
+  });
+  PARAMS.forEach(p => {
+    payload.params[p.id] = {};
+    payload.notes[p.id]  = {};
+    CONDS.forEach(c => {
+      const sel  = document.getElementById('sel_'+p.id+'_'+c);
+      payload.params[p.id][c] = sel ? sel.value : '';
+      const note = document.getElementById('note_'+p.id+'_'+c);
+      payload.notes[p.id][c]  = note ? note.value : '';
+      if(p.hasColorTone){
+        const tone = document.getElementById('tone_'+c);
+        if(!payload.colorTones[c]) payload.colorTones[c] = tone ? tone.value : '';
+      }
+    });
+  });
+
+  try {
+    if(DEMO_MODE){
+      // ── Demo mode — simulate save ──
+      await new Promise(r => setTimeout(r, 500));
+      showToast('✅ บันทึกสำเร็จ (Demo)');
+    } else {
+      // ── Firebase save — เร็ว < 0.5วิ ──
+      const newRef = FB.newRecord();
+      await newRef.set(payload);
+
+      // บันทึก history ของ Sample ด้วย (ใช้ดึงใน History tab)
+      await fbDB.ref(`samples/${ST.sampleNo}/history/${payload.week}`).set({
+        ph    : payload.ph,
+        params: payload.params,
+        week  : payload.week,
+        ts    : payload.timestamp,
+      });
+
+      showToast('✅ บันทึก ' + payload.week + ' สำเร็จ!');
+    }
+
+    // อัปเดต local state
+    const w = payload.week;
+    ST.history[w] = ST.history[w] || {};
+    ST.history[w].ph = payload.ph;
+    PARAMS.forEach(p => { ST.history[w][p.id] = payload.params[p.id]; });
+    buildTimeline();
+    renderHistPage();
+
+  } catch(e) {
+    showToast('⚠ บันทึกไม่สำเร็จ: ' + e.message);
+    console.error(e);
+  }
+
+  btn.classList.remove('saving');
+  btn.innerHTML = '<span>💾</span><span>ส่งข้อมูล & บันทึก</span>';
+}
+
+// ═══════════════════════════
+//  UTILS
+// ═══════════════════════════
+function switchTab(t){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  document.getElementById('page-'+t).classList.add('on');
+  document.getElementById('tab-'+t).classList.add('on');
+}
+
+function saveDraft(){
+  const d={sampleNo:ST.sampleNo,week:document.getElementById('weekSel').value,ts:new Date().toISOString()};
+  try{localStorage.setItem('staDraft',JSON.stringify(d));showToast('📋 Draft บันทึกแล้ว');}catch(e){}
+}
+
+function clearForm(){
+  if(!confirm('ล้างข้อมูลในฟอร์มทั้งหมด?')) return;
+  CONDS.forEach(c=>{
+    ['ph_','temp_'].forEach(prefix=>{const e=document.getElementById(prefix+c);if(e){e.value='';e.className=prefix==='ph_'?'ph-inp':'ph-inp';}});
+  });
+  PARAMS.forEach(p=>CONDS.forEach(c=>{
+    const s=document.getElementById('sel_'+p.id+'_'+c);
+    if(s){s.value='';s.className='param-sel';}
+    const n=document.getElementById('note_'+p.id+'_'+c);
+    if(n) n.value='';
+    if(p.hasColorTone){const t=document.getElementById('tone_'+c);if(t) t.value='';}
+  }));
+  resetScore();calcProgress();
+  document.getElementById('afBanner').classList.remove('show');
+  showToast('🗑️ ล้างข้อมูลแล้ว');
+}
+
+// ═══════════════════════════════════════════════════════
+//  SYNC — ดึง Dropdown + Recorders จาก Firebase
+//  (Apps Script เขียน config ลง Firebase ทุกครั้งที่แก้ Sheet)
+// ═══════════════════════════════════════════════════════
+async function syncSheet(){
+  showToast('⟳ กำลัง Sync...');
+  try {
+    if(DEMO_MODE){
+      await new Promise(r => setTimeout(r, 600));
+      applyRecorderList(['สมชาย QC','สมหญิง QC','นายA Lab','นางสาวB Lab']);
+      showToast('✅ Sync สำเร็จ (Demo)');
+      return;
+    }
+
+    // ── ดึงจาก Firebase config node ──
+    const snap = await FB.config().get();
+    if(!snap.exists()) throw new Error('ยังไม่มี config ใน Firebase');
+    const cfg = snap.val();
+
+    if(cfg.dropdowns) applySheetDropdowns(cfg.dropdowns);
+    if(cfg.recorders && Array.isArray(cfg.recorders)){
+      applyRecorderList(cfg.recorders);
+    }
+    if(cfg.scoreConfig) applyScoreConfig(cfg.scoreConfig);
+
+    showToast('✅ Sync สำเร็จ!');
+    if(ST.sampleNo) onSampleInput();
+
+  } catch(e){
+    // fallback to GAS
+    if(GAS_URL && GAS_URL !== 'YOUR_APPS_SCRIPT_URL'){
+      try {
+        const [ddRes, recRes] = await Promise.all([
+          fetch(GAS_URL+'?action=getDropdowns'),
+          fetch(GAS_URL+'?action=getRecorders'),
+        ]);
+        const dd  = await ddRes.json();
+        const rec = await recRes.json();
+        if(!dd.error) applySheetDropdowns(dd);
+        if(rec.names) applyRecorderList(rec.names);
+        showToast('✅ Sync จาก GAS (fallback)');
+      } catch(e2){ showToast('⚠ Sync ไม่สำเร็จ: '+e.message); }
+    } else {
+      showToast('⚠ '+e.message);
+    }
+  }
+}
+
+function applyScoreConfig(sc){
+  if(!sc) return;
+  if(sc.phMin)       SCORE_CFG.phMin       = parseFloat(sc.phMin);
+  if(sc.phMax)       SCORE_CFG.phMax       = parseFloat(sc.phMax);
+  if(sc.phWarnDelta) SCORE_CFG.phWarnDelta = parseFloat(sc.phWarnDelta);
+  if(sc.phFailDelta) SCORE_CFG.phFailDelta = parseFloat(sc.phFailDelta);
+  if(sc.grades)      SCORE_CFG.grade       = sc.grades;
+}
+
+// ── applySheetDropdowns ──────────────────────────────────
+//  sheetData = { texture:[{label,score,autoFail,level},...],
+//                color:[...], odor:[...], ... }
+//  (ตรง format ที่ getDropdownOptions() ใน Apps Script คืน)
+function applySheetDropdowns(sheetData) {
+  let updated = 0;
+  PARAMS.forEach(p => {
+    const arr = sheetData[p.id];
+    if(!arr || !Array.isArray(arr) || !arr.length) return;
+    p.opts = arr.map(o => ({
+      l:  o.label,
+      s:  parseFloat(o.score) || 0,
+      lv: o.level    || 'ok',
+      af: !!o.autoFail,
+    }));
+    p.max = Math.max(...p.opts.map(o => o.s));
+    updated++;
+  });
+
+  // อัปเดต SCORE_CFG จาก scoreConfig ใน sheetData
+  if(sheetData.scoreConfig){
+    const sc = sheetData.scoreConfig;
+    if(sc.physWeight)  SCORE_CFG.physWeight  = parseFloat(sc.physWeight);
+    if(sc.chemWeight)  SCORE_CFG.chemWeight  = parseFloat(sc.chemWeight);
+    if(sc.phMin)       SCORE_CFG.phMin       = parseFloat(sc.phMin);
+    if(sc.phMax)       SCORE_CFG.phMax       = parseFloat(sc.phMax);
+    if(sc.phWarnDelta) SCORE_CFG.phWarnDelta = parseFloat(sc.phWarnDelta);
+    if(sc.phFailDelta) SCORE_CFG.phFailDelta = parseFloat(sc.phFailDelta);
+    if(sc.grades)      SCORE_CFG.grade       = sc.grades;
+  }
+
+  buildForm();
+  showToast(`✅ Sync สำเร็จ (${updated} Parameter)`);
+}
+
+let toastTimer;
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// ═══════════════════════════
+//  INIT — โหลด Dropdown จาก Sheet ตอนเปิดแอป
+// ═══════════════════════════
+async function initApp() {
+  initLotDropdowns();
+  buildRecorderDropdown(RECORDERS);
+  buildForm();
+  calcProgress();
+
+  // ── โหลด config จาก Firebase (หรือ GAS fallback) ──
+  if(!DEMO_MODE){
+    try {
+      const snap = await FB.config().get();
+      if(snap.exists()){
+        const cfg = snap.val();
+        if(cfg.dropdowns) applySheetDropdowns(cfg.dropdowns);
+        if(cfg.recorders) applyRecorderList(cfg.recorders);
+        if(cfg.scoreConfig) applyScoreConfig(cfg.scoreConfig);
+      }
+    } catch(e){ console.log('Firebase config load failed:', e.message); }
+  } else if(GAS_URL && GAS_URL !== 'YOUR_APPS_SCRIPT_URL'){
+    try {
+      const res = await fetch(GAS_URL + '?action=getDropdowns');
+      const d   = await res.json();
+      if(!d.error) applySheetDropdowns(d);
+    } catch(e){ console.log('GAS load failed:', e.message); }
+  }
+
+  // ── Restore draft ──
+  try{
+    const d = JSON.parse(localStorage.getItem('staDraft')||'{}');
+    if(d.sampleNo){ document.getElementById('sampleNo').value=d.sampleNo; onSampleInput(); }
+    if(d.week){ document.getElementById('weekSel').value=d.week; onWeekChange(); }
+  }catch(e){}
+}
+
+initApp();
+</script>
+</body>
+</html>
