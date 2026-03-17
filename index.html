@@ -999,7 +999,7 @@ tr:hover td{background:var(--bg)}
 //  ← วาง config จาก Firebase Console ที่นี่
 //    (Project Settings → Your apps → SDK setup)
 // ═══════════════════════════════════════════════════════
-cconst firebaseConfig = {
+const firebaseConfig = {
 
   apiKey: "AIzaSyBj0VdrDx8Sf_gjm_hMPMEr2SXY0shcPaI",
 
@@ -1019,7 +1019,7 @@ cconst firebaseConfig = {
 
 
 // ── Demo mode: true = ใช้ mock data ไม่ต้อง Firebase จริง ──
-const DEMO_MODE = FIREBASE_CFG.apiKey === "YOUR_API_KEY";
+const DEMO_MODE = FIREBASE_CFG.apiKey === "AIzaSyBj0VdrDx8Sf_gjm_hMPMEr2SXY0shcPaI;
 
 // ── Firebase references ──
 let fbApp = null, fbDB = null;
@@ -1040,7 +1040,7 @@ const FB = {
 };
 
 // ── GAS_URL ยังใช้ได้สำหรับ getDropdowns/getRecorders fallback ──
-const GAS_URL = https://script.google.com/macros/s/AKfycbw3JLUF3M8o0nSKhyJmNajNrQrBQma19IG1ZJ8FL0MYErPfAsMMOpZQpPYfRuQt_eKt6w/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbw3JLUF3M8o0nSKhyJmNajNrQrBQma19IG1ZJ8FL0MYErPfAsMMOpZQpPYfRuQt_eKt6w/exec';
 
 const CONDS = ['rt','50','4','cl'];
 const COND_LBL = {rt:'RT', '50':'50°C', '4':'4°C', cl:'Light'};
