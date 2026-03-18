@@ -1208,9 +1208,9 @@ function buildRecorderDropdown(list){
 }
 
 function applyRecorderList(names){
-  // กรอง บรรทัด instruction และ hint ออก
-  const SKIP = ['💡','←','ชื่อผู้บันทึก','หมายเหตุ','—'];
-  const clean = names
+  const arr = toArray(names);  // handle Firebase object→array
+  const SKIP = ['💡','←','ชื่อผู้บันทึก','หมายเหตุ','—','Role','หมาย'];
+  const clean = arr
     .map(n => (n||'').toString().trim())
     .filter(n => n.length > 0 && !SKIP.some(s => n.startsWith(s)));
   RECORDERS = ['— เลือกผู้บันทึก —', ...clean];
@@ -1511,16 +1511,18 @@ const MOCK_W0_MASTER = {
 };
 
 async function fetchW0Appearance(){
-  if(!ST.sampleNo){showToast('⚠ กรอก Sample No. ก่อน');return;}
+  // ใช้ LOT เป็นหลัก ถ้าไม่มีค่อยใช้ Sample No.
+  const id = ST.lotValue || ST.sampleNo;
+  if(!id){showToast('⚠ กรอก LOT No. หรือ Sample No. ก่อน');return;}
   const btn=document.getElementById('w0FetchBtn');
   const status=document.getElementById('w0AppStatus');
   btn.classList.add('loading');btn.textContent='⟳ กำลังดึง...';
   status.className='w0app-status';status.innerHTML='<span>⟳</span><span>กำลังเชื่อมต่อ Master Sheet...</span>';
   try{
-    // จริงๆ: const res=await fetch(GAS_URL+'?action=getW0&id='+ST.sampleNo); const data=await res.json();
+    // จริงๆ: const res=await fetch(GAS_URL+'?action=getW0&id='+id); const data=await res.json();
     await new Promise(r=>setTimeout(r,1200));
-    const data=MOCK_W0_MASTER[ST.sampleNo];
-    if(!data) throw new Error('ไม่พบข้อมูล W0 ใน Master Sheet');
+    const data=MOCK_W0_MASTER[id] || MOCK_W0_MASTER[ST.sampleNo];
+    if(!data) throw new Error('ไม่พบข้อมูล W0 สำหรับ: '+id);
     if(!ST.history['W0']) ST.history['W0']={};
     Object.assign(ST.history['W0'], data);
     renderW0AppGrid(data);
@@ -1816,8 +1818,11 @@ function calcProgress(){
 //  VALIDATION & SUBMIT
 // ═══════════════════════════
 function handleSubmit(){
+  const sNo  = document.getElementById('sampleNo').value.trim();
+  const lot  = ST.lotValue || '';
   const missing=[];
-  if(!document.getElementById('sampleNo').value) missing.push({icon:'🧪', txt:'Sample No. ยังไม่ได้กรอก'});
+  // ต้องมีอย่างน้อย Sample No. หรือ LOT
+  if(!sNo && !lot) missing.push({icon:'🧪', txt:'Sample No. หรือ LOT No. อย่างน้อยหนึ่งอย่าง'});
   if(!document.getElementById('weekSel').value) missing.push({icon:'📅', txt:'ยังไม่ได้เลือก Week'});
   const hasAnyPh=CONDS.some(c=>document.getElementById('ph_'+c).value);
   if(!hasAnyPh) missing.push({icon:'⚗️', txt:'ยังไม่ได้กรอกค่า pH เลย'});
@@ -1839,17 +1844,18 @@ async function saveToSheet(){
   btn.classList.add('saving');
   btn.innerHTML = '<span>⏳</span><span>กำลังบันทึก...</span>';
 
-  // identifier = Sample No หรือ LOT อย่างใดอย่างหนึ่ง
-  const identifier = ST.sampleNo || ST.lotValue || '';
+  // identifier = LOT ก่อน ถ้าไม่มีค่อยใช้ Sample No.
+  const identifier = ST.lotValue || ST.sampleNo || '';
   if(!identifier){
-    showToast('⚠ กรุณากรอก Sample No. หรือ LOT ก่อน');
+    showToast('⚠ กรุณากรอก LOT No. หรือ Sample No. ก่อน');
     btn.classList.remove('saving');
     btn.innerHTML = '<span>💾</span><span>ส่งข้อมูล & บันทึก</span>';
     return;
   }
 
   const payload = {
-    sampleNo   : ST.sampleNo   || '',
+    sampleNo   : identifier,                // Firebase validate ต้องมี sampleNo
+    sampleNoOrig: ST.sampleNo || '',        // Sample No. จริง (ถ้ามี)
     sampleName : document.getElementById('dispName').textContent || '',
     week       : getWeekValue(),
     lot        : ST.lotValue   || '',
@@ -1985,17 +1991,27 @@ async function syncSheet(){
 }
 
 // applySheetDropdowns แบบไม่ toast (ใช้ใน sync และ init)
+// ── แปลง Firebase value → Array (Firebase เก็บ array เป็น object {"0":{...},"1":{...}}) ──
+function toArray(val){
+  if(!val) return [];
+  if(Array.isArray(val)) return val;
+  // Firebase object with numeric keys → convert to array
+  return Object.keys(val).sort((a,b)=>Number(a)-Number(b)).map(k=>val[k]);
+}
+
 function applySheetDropdownsSilent(sheetData) {
+  if(!sheetData) return;
   PARAMS.forEach(p => {
-    const arr = sheetData[p.id];
-    if(!arr || !Array.isArray(arr) || !arr.length) return;
+    const raw = sheetData[p.id];
+    const arr = toArray(raw);
+    if(!arr.length) return;
     p.opts = arr.map(o => ({
-      l:  o.label,
-      s:  parseFloat(o.score) || 0,
-      lv: o.level    || 'ok',
-      af: !!o.autoFail,
-    }));
-    p.max = Math.max(...p.opts.map(o => o.s));
+      l:  o.label  || o.l || '',
+      s:  parseFloat(o.score ?? o.s) || 0,
+      lv: o.level  || o.lv || 'ok',
+      af: !!(o.autoFail || o.af),
+    })).filter(o => o.l);
+    if(p.opts.length) p.max = Math.max(...p.opts.map(o => o.s));
   });
 }
 
