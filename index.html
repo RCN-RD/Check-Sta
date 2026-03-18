@@ -672,8 +672,8 @@ tr:hover td{background:var(--bg)}
   <!-- STICKY SAMPLE BAR — ตรึงไว้เมื่อ scroll -->
   <div class="sticky-sample" id="stickySample">
     <div class="ss-left">
-      <div class="ss-no empty" id="ssNo">— Sample No. —</div>
-      <div class="ss-name empty" id="ssName">กรอก Sample No. เพื่อเริ่มต้น</div>
+      <div class="ss-no empty" id="ssNo">— กรอก Sample No. หรือ LOT —</div>
+      <div class="ss-name empty" id="ssName">กรอกข้อมูลเพื่อเริ่มต้น</div>
     </div>
     <div class="ss-right">
       <div class="ss-dot" id="ssDot"></div>
@@ -729,7 +729,8 @@ tr:hover td{background:var(--bg)}
       <!-- No — 3 digits -->
       <input class="sc-inp sc-lot-no" id="lotNo"
              placeholder="No" maxlength="3"
-             oninput="onLotChange()" type="text" inputmode="numeric">
+             oninput="onLotChange(false)" onblur="onLotChange(true)"
+             type="text" inputmode="numeric">
 
       <!-- Suffix — 1 char -->
       <input class="sc-inp sc-lot-sfx" id="lotSfx"
@@ -1121,27 +1122,32 @@ function initLotDropdowns(){
   onLotChange();
 }
 
-function onLotChange(){
+function onLotChange(doPad){
   const yr  = document.getElementById('lotYear').value;
   const mo  = document.getElementById('lotMonth').value;
   let   no  = document.getElementById('lotNo').value.replace(/\D/g,'');
   const sfx = document.getElementById('lotSfx').value.toUpperCase().replace(/[^A-Z]/g,'');
 
-  if(no) no = no.padStart(3,'0');
+  // pad เฉพาะตอน blur เพื่อไม่ให้ขึ้น 000 ตอนพิมพ์
+  if(doPad && no) no = no.padStart(3,'0');
   document.getElementById('lotNo').value  = no;
   document.getElementById('lotSfx').value = sfx;
 
   const prev = document.getElementById('lotPreview');
   if(yr && mo && no){
-    // format: yy-mm-xxxA  เช่น 68-03-001A
-    const lotStr = yr + '-' + mo + '-' + no + sfx;
+    const lotStr = yr + '-' + mo + '-' + (no.length===3?no:no.padStart(3,'0')) + (sfx?'-'+sfx:'');
     prev.textContent = 'LOT: ' + lotStr;
     prev.classList.add('filled');
-    ST.lotValue = lotStr;   // เก็บใน state
+    ST.lotValue = lotStr;
+    // ถ้า Sample No ว่าง → ใช้ LOT เป็น identifier
+    if(!ST.sampleNo){
+      syncStickyBar();
+    }
   } else {
     prev.textContent = '—';
     prev.classList.remove('filled');
     ST.lotValue = '';
+    syncStickyBar();
   }
 }
 
@@ -1202,10 +1208,13 @@ function buildRecorderDropdown(list){
 }
 
 function applyRecorderList(names){
-  // names = string[] จาก Sheet
-  RECORDERS = ['— เลือกผู้บันทึก —', ...names];
+  // กรอง บรรทัด instruction และ hint ออก
+  const SKIP = ['💡','←','ชื่อผู้บันทึก','หมายเหตุ','—'];
+  const clean = names
+    .map(n => (n||'').toString().trim())
+    .filter(n => n.length > 0 && !SKIP.some(s => n.startsWith(s)));
+  RECORDERS = ['— เลือกผู้บันทึก —', ...clean];
   buildRecorderDropdown(RECORDERS);
-  showToast('✅ รายชื่อผู้บันทึกอัปเดตแล้ว');
 }
 
 // ═══════════════════════════
@@ -1420,26 +1429,34 @@ function jumpWeek(w){
 //  STICKY BAR — sync กับ form
 // ═══════════════════════════
 function syncStickyBar(){
-  const no   = ST.sampleNo;
-  const name = document.getElementById('dispName').textContent;
-  const week = document.getElementById('weekSel').value;
-  const hasData = week && ST.history[week];
+  const sampleNo = ST.sampleNo;
+  const lotVal   = ST.lotValue || '';
+  const id       = sampleNo || lotVal;   // ใช้อย่างใดอย่างหนึ่ง
+  const name     = document.getElementById('dispName').textContent;
+  const week     = document.getElementById('weekSel').value;
+  const hasData  = week && ST.history[week];
 
   const ssNo   = document.getElementById('ssNo');
   const ssName = document.getElementById('ssName');
   const ssDot  = document.getElementById('ssDot');
   const ssWeek = document.getElementById('ssWeekSel');
 
-  if(no && !document.getElementById('dispName').classList.contains('empty')){
-    ssNo.textContent = no;   ssNo.classList.remove('empty');
-    ssName.textContent = name; ssName.classList.remove('empty');
+  if(id){
+    ssNo.textContent = sampleNo ? sampleNo : ('LOT: ' + lotVal);
+    ssNo.classList.remove('empty');
+    const nameText = document.getElementById('dispName').classList.contains('empty')
+      ? (lotVal ? 'LOT ' + lotVal : '—') : name;
+    ssName.textContent = nameText;
+    ssName.classList.remove('empty');
   } else {
-    ssNo.textContent = '— Sample No. —'; ssNo.classList.add('empty');
-    ssName.textContent = 'กรอก Sample No. เพื่อเริ่มต้น'; ssName.classList.add('empty');
+    ssNo.textContent  = '— กรอก Sample No. หรือ LOT —';
+    ssNo.classList.add('empty');
+    ssName.textContent = 'กรอกข้อมูลเพื่อเริ่มต้น';
+    ssName.classList.add('empty');
   }
   ssWeek.value = week || '';
   ssDot.className = 'ss-dot' + (hasData?' has':'') +
-    (hasData&&(ST.history[week].grade==='D')?' fail':'');
+    (hasData&&(ST.history[week]&&ST.history[week].grade==='D')?' fail':'');
 }
 
 // เมื่อเลือก Week จาก sticky bar — sync กลับไปที่ form จริง
@@ -1822,26 +1839,26 @@ async function saveToSheet(){
   btn.classList.add('saving');
   btn.innerHTML = '<span>⏳</span><span>กำลังบันทึก...</span>';
 
-  // ── รวบรวม payload ──────────────────────────────────
-  const lotNo = (() => {
-    const yr=document.getElementById('lotYear').value;
-    const mo=document.getElementById('lotMonth').value;
-    const no=document.getElementById('lotNo').value;
-    const sfx=document.getElementById('lotSfx').value;
-    return (yr&&mo&&no) ? yr+mo+no+sfx : '';
-  })();
+  // identifier = Sample No หรือ LOT อย่างใดอย่างหนึ่ง
+  const identifier = ST.sampleNo || ST.lotValue || '';
+  if(!identifier){
+    showToast('⚠ กรุณากรอก Sample No. หรือ LOT ก่อน');
+    btn.classList.remove('saving');
+    btn.innerHTML = '<span>💾</span><span>ส่งข้อมูล & บันทึก</span>';
+    return;
+  }
 
   const payload = {
-    sampleNo   : ST.sampleNo,
-    sampleName : document.getElementById('dispName').textContent,
+    sampleNo   : ST.sampleNo   || '',
+    sampleName : document.getElementById('dispName').textContent || '',
     week       : getWeekValue(),
-    lot        : ST.lotValue || '',    // format: yy-mm-xxxA
-    no_        : ST.tFlag || '',       // "T-" หรือ ""
+    lot        : ST.lotValue   || '',
+    no_        : ST.tFlag      || '',
     recorder   : document.getElementById('recorderSel').value || '—',
     timestamp  : new Date().toISOString(),
-    savedAt    : Date.now(),           // Firebase timestamp (ms)
+    savedAt    : Date.now(),
     ph:{}, temp:{}, params:{}, notes:{}, colorTones:{},
-    synced     : false,                // Apps Script จะเปลี่ยนเป็น true หลัง sync ลง Sheets
+    synced     : false,
   };
 
   CONDS.forEach(c => {
@@ -1865,23 +1882,23 @@ async function saveToSheet(){
 
   try {
     if(DEMO_MODE){
-      // ── Demo mode — simulate save ──
       await new Promise(r => setTimeout(r, 500));
       showToast('✅ บันทึกสำเร็จ (Demo)');
     } else {
-      // ── Firebase save — เร็ว < 0.5วิ ──
+      // ── Firebase save ──
       const newRef = FB.newRecord();
       await newRef.set(payload);
 
-      // บันทึก history ของ Sample ด้วย (ใช้ดึงใน History tab)
-      await fbDB.ref(`samples/${ST.sampleNo}/history/${payload.week}`).set({
+      // บันทึก history ของ Sample ด้วย (ใช้ identifier = sampleNo หรือ lot)
+      const histKey = (ST.sampleNo || ST.lotValue || 'unknown').replace(/[.#$/[\]]/g,'_');
+      await fbDB.ref(`samples/${histKey}/history/${payload.week}`).set({
         ph    : payload.ph,
         params: payload.params,
         week  : payload.week,
         ts    : payload.timestamp,
       });
 
-      showToast('✅ บันทึก ' + payload.week + ' สำเร็จ!');
+      showToast('✅ บันทึก ' + payload.week + ' → Firebase สำเร็จ!');
     }
 
     // อัปเดต local state
@@ -1943,42 +1960,43 @@ async function syncSheet(){
     if(DEMO_MODE){
       await new Promise(r => setTimeout(r, 600));
       applyRecorderList(['สมชาย QC','สมหญิง QC','นายA Lab','นางสาวB Lab']);
+      buildForm();
       showToast('✅ Sync สำเร็จ (Demo)');
       return;
     }
 
     // ── ดึงจาก Firebase config node ──
     const snap = await FB.config().get();
-    if(!snap.exists()) throw new Error('ยังไม่มี config ใน Firebase');
+    if(!snap.exists()) throw new Error('ยังไม่มี config ใน Firebase — รัน manualPushConfig() ใน Apps Script ก่อน');
     const cfg = snap.val();
 
-    if(cfg.dropdowns) applySheetDropdowns(cfg.dropdowns);
-    if(cfg.recorders && Array.isArray(cfg.recorders)){
-      applyRecorderList(cfg.recorders);
-    }
+    if(cfg.dropdowns) applySheetDropdownsSilent(cfg.dropdowns);
+    if(cfg.recorders) applyRecorderList(cfg.recorders);
     if(cfg.scoreConfig) applyScoreConfig(cfg.scoreConfig);
 
+    buildForm();   // re-render dropdown ด้วย options ใหม่
     showToast('✅ Sync สำเร็จ!');
     if(ST.sampleNo) onSampleInput();
 
   } catch(e){
-    // fallback to GAS
-    if(GAS_URL && GAS_URL !== 'YOUR_APPS_SCRIPT_URL'){
-      try {
-        const [ddRes, recRes] = await Promise.all([
-          fetch(GAS_URL+'?action=getDropdowns'),
-          fetch(GAS_URL+'?action=getRecorders'),
-        ]);
-        const dd  = await ddRes.json();
-        const rec = await recRes.json();
-        if(!dd.error) applySheetDropdowns(dd);
-        if(rec.names) applyRecorderList(rec.names);
-        showToast('✅ Sync จาก GAS (fallback)');
-      } catch(e2){ showToast('⚠ Sync ไม่สำเร็จ: '+e.message); }
-    } else {
-      showToast('⚠ '+e.message);
-    }
+    console.error('syncSheet error:', e);
+    showToast('⚠ ' + e.message);
   }
+}
+
+// applySheetDropdowns แบบไม่ toast (ใช้ใน sync และ init)
+function applySheetDropdownsSilent(sheetData) {
+  PARAMS.forEach(p => {
+    const arr = sheetData[p.id];
+    if(!arr || !Array.isArray(arr) || !arr.length) return;
+    p.opts = arr.map(o => ({
+      l:  o.label,
+      s:  parseFloat(o.score) || 0,
+      lv: o.level    || 'ok',
+      af: !!o.autoFail,
+    }));
+    p.max = Math.max(...p.opts.map(o => o.s));
+  });
 }
 
 function applyScoreConfig(sc){
@@ -2048,17 +2066,12 @@ async function initApp() {
       const snap = await FB.config().get();
       if(snap.exists()){
         const cfg = snap.val();
-        if(cfg.dropdowns) applySheetDropdowns(cfg.dropdowns);
+        if(cfg.dropdowns) applySheetDropdownsSilent(cfg.dropdowns);
         if(cfg.recorders) applyRecorderList(cfg.recorders);
         if(cfg.scoreConfig) applyScoreConfig(cfg.scoreConfig);
+        buildForm();   // re-render ด้วย options จาก Firebase
       }
     } catch(e){ console.log('Firebase config load failed:', e.message); }
-  } else if(GAS_URL && GAS_URL !== 'YOUR_APPS_SCRIPT_URL'){
-    try {
-      const res = await fetch(GAS_URL + '?action=getDropdowns');
-      const d   = await res.json();
-      if(!d.error) applySheetDropdowns(d);
-    } catch(e){ console.log('GAS load failed:', e.message); }
   }
 
   // ── Restore draft ──
