@@ -1440,8 +1440,7 @@ function jumpWeek(w){
 function syncStickyBar(){
   const sampleNo = ST.sampleNo;
   const lotVal   = ST.lotValue || '';
-  const id       = sampleNo || lotVal;   // ใช้อย่างใดอย่างหนึ่ง
-  const name     = document.getElementById('dispName').textContent;
+  const tFlag    = ST.tFlag    || '';
   const week     = document.getElementById('weekSel').value;
   const hasData  = week && ST.history[week];
 
@@ -1450,22 +1449,29 @@ function syncStickyBar(){
   const ssDot  = document.getElementById('ssDot');
   const ssWeek = document.getElementById('ssWeekSel');
 
-  if(id){
-    ssNo.textContent = sampleNo ? sampleNo : ('LOT: ' + lotVal);
+  // แสดงผลใน sticky bar:
+  // ถ้ามี T- → แสดง tFlag (เช่น T-STA001)
+  // ถ้าไม่มี T- แต่มี SampleNo → แสดง SampleNo
+  // ถ้าไม่มีทั้งคู่ แต่มี LOT → แสดง LOT
+  const displayId = tFlag || sampleNo || (lotVal ? 'LOT: '+lotVal : '');
+
+  if(displayId){
+    ssNo.textContent = displayId;
     ssNo.classList.remove('empty');
+    const name     = document.getElementById('dispName').textContent;
     const nameText = document.getElementById('dispName').classList.contains('empty')
-      ? (lotVal ? 'LOT ' + lotVal : '—') : name;
+      ? (lotVal ? 'LOT '+lotVal : '—') : name;
     ssName.textContent = nameText;
     ssName.classList.remove('empty');
   } else {
-    ssNo.textContent  = '— กรอก Sample No. หรือ LOT —';
+    ssNo.textContent   = '— กรอก Sample No. หรือ LOT —';
     ssNo.classList.add('empty');
     ssName.textContent = 'กรอกข้อมูลเพื่อเริ่มต้น';
     ssName.classList.add('empty');
   }
   ssWeek.value = week || '';
   ssDot.className = 'ss-dot' + (hasData?' has':'') +
-    (hasData&&(ST.history[week]&&ST.history[week].grade==='D')?' fail':'');
+    (hasData&&ST.history[week]&&ST.history[week].grade==='D'?' fail':'');
 }
 
 // เมื่อเลือก Week จาก sticky bar — sync กลับไปที่ form จริง
@@ -1880,22 +1886,21 @@ async function saveToSheet(){
     return;
   }
 
-  // คำนวณ no_ field:
-  // ติ๊ก T- + มี Sample No → "T-STA001"
-  // ติ๊ก T- + ไม่มี Sample No → "T-"
-  // ไม่ติ๊ก + มี Sample No → "STA001"
-  // ไม่มีทั้งคู่ → ""
-  const checked  = document.getElementById('tCheck').checked;
-  const sNo      = ST.sampleNo || '';
-  const noField  = checked ? ('T-' + sNo) : sNo;
+  // T- Logic:
+  // Sample_No column → "T-" ถ้าติ๊ก, Sample No จริงถ้าไม่ติ๊ก, "" ถ้าไม่มี
+  // No. column (no_) → เก็บค่าเต็ม เช่น T-STA001 หรือ STA001
+  const checked    = document.getElementById('tCheck').checked;
+  const sNoRaw     = ST.sampleNo || '';
+  const sampleNoField = checked ? 'T-' : sNoRaw;   // บันทึกใน Sample_No column
+  const noField       = checked ? ('T-' + sNoRaw) : sNoRaw;  // บันทึกใน No. column
 
   const payload = {
-    sampleNo    : identifier,
-    sampleNoOrig: sNo,
+    sampleNo    : identifier,          // Firebase key (LOT หรือ SampleNo)
+    sampleNoOrig: sampleNoField,       // Sample_No column: "T-" หรือ SampleNo จริง
     sampleName  : document.getElementById('dispName').textContent || '',
     week        : getWeekValue(),
     lot         : ST.lotValue || '',
-    no_         : noField,          // T-STA001 / STA001 / T- / ""
+    no_         : noField,             // No. column: T-STA001 หรือ STA001
     recorder    : document.getElementById('recorderSel').value || '—',
     timestamp   : new Date().toISOString(),
     savedAt     : Date.now(),
