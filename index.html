@@ -1153,9 +1153,10 @@ function onLotChange(doPad){
 }
 
 function onTCheck(){
-  const checked = document.getElementById('tCheck').checked;
-  ST.tFlag = checked ? 'T-' : '';
-  // อัปเดต sticky bar ให้แสดง T- prefix
+  const checked  = document.getElementById('tCheck').checked;
+  const sampleNo = document.getElementById('sampleNo').value.trim();
+  // T- ตามด้วย sample no ที่กรอก (ถ้ามี)
+  ST.tFlag = checked ? ('T-' + (sampleNo || '')) : (sampleNo || '');
   syncStickyBar();
 }
 
@@ -1280,6 +1281,11 @@ function onSampleInput(){
   const v = document.getElementById('sampleNo').value.toUpperCase();
   document.getElementById('sampleNo').value = v;
   ST.sampleNo = v;
+
+  // อัปเดต T- ตามด้วย sample no ที่เปลี่ยน
+  const checked = document.getElementById('tCheck').checked;
+  ST.tFlag = checked ? ('T-' + (v || '')) : (v || '');
+
   const s = SAMPLES[v];
   if(s){
     document.getElementById('dispName').textContent = s.name;
@@ -1293,7 +1299,7 @@ function onSampleInput(){
     document.getElementById('histSampleName').textContent = s.name;
     document.getElementById('histSampleCode').textContent = v + ' · ' + s.code;
   } else {
-    document.getElementById('dispName').textContent = '— ไม่พบข้อมูล —';
+    document.getElementById('dispName').textContent = v ? '— ไม่พบข้อมูล —' : '— กรอก Sample No. —';
     document.getElementById('dispName').classList.add('empty');
     document.getElementById('dispCode').textContent = '—';
     ST.history = {};
@@ -1514,31 +1520,49 @@ const MOCK_W0_MASTER = {
 };
 
 async function fetchW0Appearance(){
-  // ใช้ LOT เป็นหลัก ถ้าไม่มีค่อยใช้ Sample No.
   const id = ST.lotValue || ST.sampleNo;
-  if(!id){showToast('⚠ กรอก LOT No. หรือ Sample No. ก่อน');return;}
-  const btn=document.getElementById('w0FetchBtn');
-  const status=document.getElementById('w0AppStatus');
-  btn.classList.add('loading');btn.textContent='⟳ กำลังดึง...';
-  status.className='w0app-status';status.innerHTML='<span>⟳</span><span>กำลังเชื่อมต่อ Master Sheet...</span>';
-  try{
-    // จริงๆ: const res=await fetch(GAS_URL+'?action=getW0&id='+id); const data=await res.json();
-    await new Promise(r=>setTimeout(r,1200));
-    const data=MOCK_W0_MASTER[id] || MOCK_W0_MASTER[ST.sampleNo];
-    if(!data) throw new Error('ไม่พบข้อมูล W0 สำหรับ: '+id);
-    if(!ST.history['W0']) ST.history['W0']={};
+  if(!id){ showToast('⚠ กรอก LOT No. หรือ Sample No. ก่อน'); return; }
+
+  const btn    = document.getElementById('w0FetchBtn');
+  const status = document.getElementById('w0AppStatus');
+  btn.classList.add('loading');
+  btn.textContent = '⟳ กำลังดึง...';
+  status.className = 'w0app-status';
+  status.innerHTML = '<span>⟳</span><span>กำลังเชื่อมต่อ Master Sheet...</span>';
+
+  try {
+    let data = null;
+
+    if(GAS_URL && GAS_URL !== 'YOUR_APPS_SCRIPT_URL'){
+      // ── เรียก GAS จริง ──
+      const res = await fetch(GAS_URL + '?action=getW0&id=' + encodeURIComponent(id));
+      const json = await res.json();
+      if(json.error) throw new Error(json.error);
+      data = json;
+    } else {
+      // ── Demo mode — ใช้ mock ──
+      await new Promise(r => setTimeout(r, 800));
+      data = MOCK_W0_MASTER[id] || MOCK_W0_MASTER[ST.sampleNo];
+      if(!data) throw new Error('ไม่พบข้อมูล W0 สำหรับ: ' + id + ' (Demo mode)');
+    }
+
+    if(!ST.history['W0']) ST.history['W0'] = {};
     Object.assign(ST.history['W0'], data);
     renderW0AppGrid(data);
-    status.className='w0app-status ok';
-    status.innerHTML=`<span>✅</span><span>ดึงข้อมูล W0 สำเร็จ · ${new Date().toLocaleTimeString('th-TH')}</span>`;
+    status.className = 'w0app-status ok';
+    status.innerHTML = `<span>✅</span><span>ดึงข้อมูล W0 สำเร็จ (${id}) · ${new Date().toLocaleTimeString('th-TH')}</span>`;
     showW0Refs();
     showToast('✅ โหลด W0 Appearance แล้ว');
-  }catch(e){
-    status.className='w0app-status err';
-    status.innerHTML=`<span>❌</span><span>${e.message}</span>`;
-    showToast('⚠ '+e.message);
+
+  } catch(e) {
+    status.className = 'w0app-status err';
+    status.innerHTML = `<span>❌</span><span>${e.message}</span>`;
+    showToast('⚠ ' + e.message);
+    console.error('fetchW0 error:', e);
   }
-  btn.classList.remove('loading');btn.textContent='⟳ ดึงข้อมูล W0';
+
+  btn.classList.remove('loading');
+  btn.textContent = '⟳ ดึงข้อมูล W0';
 }
 
 function renderW0AppGrid(data){
@@ -1856,18 +1880,27 @@ async function saveToSheet(){
     return;
   }
 
+  // คำนวณ no_ field:
+  // ติ๊ก T- + มี Sample No → "T-STA001"
+  // ติ๊ก T- + ไม่มี Sample No → "T-"
+  // ไม่ติ๊ก + มี Sample No → "STA001"
+  // ไม่มีทั้งคู่ → ""
+  const checked  = document.getElementById('tCheck').checked;
+  const sNo      = ST.sampleNo || '';
+  const noField  = checked ? ('T-' + sNo) : sNo;
+
   const payload = {
-    sampleNo   : identifier,                // Firebase validate ต้องมี sampleNo
-    sampleNoOrig: ST.sampleNo || '',        // Sample No. จริง (ถ้ามี)
-    sampleName : document.getElementById('dispName').textContent || '',
-    week       : getWeekValue(),
-    lot        : ST.lotValue   || '',
-    no_        : ST.tFlag      || '',
-    recorder   : document.getElementById('recorderSel').value || '—',
-    timestamp  : new Date().toISOString(),
-    savedAt    : Date.now(),
+    sampleNo    : identifier,
+    sampleNoOrig: sNo,
+    sampleName  : document.getElementById('dispName').textContent || '',
+    week        : getWeekValue(),
+    lot         : ST.lotValue || '',
+    no_         : noField,          // T-STA001 / STA001 / T- / ""
+    recorder    : document.getElementById('recorderSel').value || '—',
+    timestamp   : new Date().toISOString(),
+    savedAt     : Date.now(),
     ph:{}, temp:{}, params:{}, notes:{}, colorTones:{},
-    synced     : false,
+    synced      : false,
   };
 
   CONDS.forEach(c => {
@@ -1894,20 +1927,27 @@ async function saveToSheet(){
       await new Promise(r => setTimeout(r, 500));
       showToast('✅ บันทึกสำเร็จ (Demo)');
     } else {
-      // ── Firebase save ──
-      const newRef = FB.newRecord();
+      // ── Firebase save — ใช้ push() โดยตรงแทน FB.newRecord() ──
+      const staRawRef = fbDB.ref('sta_raw');
+      const newRef    = staRawRef.push();   // สร้าง auto-key ใหม่
+      if(!newRef || !newRef.key){
+        throw new Error('Firebase push() ไม่สำเร็จ — ตรวจสอบ Firebase config');
+      }
       await newRef.set(payload);
+      console.log('Saved to Firebase key:', newRef.key);
 
-      // บันทึก history ของ Sample ด้วย (ใช้ identifier = sampleNo หรือ lot)
-      const histKey = (ST.sampleNo || ST.lotValue || 'unknown').replace(/[.#$/[\]]/g,'_');
+      // บันทึก history ของ Sample (ใช้ LOT หรือ Sample No เป็น key)
+      const histKey = (ST.lotValue || ST.sampleNo || 'unknown')
+                      .replace(/[.#$\[\]]/g,'_');
       await fbDB.ref(`samples/${histKey}/history/${payload.week}`).set({
         ph    : payload.ph,
         params: payload.params,
         week  : payload.week,
+        lot   : payload.lot,
         ts    : payload.timestamp,
       });
 
-      showToast('✅ บันทึก ' + payload.week + ' → Firebase สำเร็จ!');
+      showToast('✅ บันทึก ' + payload.week + ' สำเร็จ!');
     }
 
     // อัปเดต local state
